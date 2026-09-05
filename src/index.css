@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-main: #f8fafc;
+    --bg-card: #ffffff;
+    --bg-card-hover: #f1f5f9;
+    --bg-panel: #ffffff;
+    --bg-subtle: #f1f5f9;
+    --bg-input: #ffffff;
+    --border-main: #e2e8f0;
+    --border-subtle: #f1f5f9;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    --accent-teal: #0d9488;
+    --accent-teal-hover: #0f766e;
+    --accent-teal-subtle: rgba(13, 148, 136, 0.12);
+    --table-header: #f8fafc;
+    --table-row-hover: #f1f5f9;
+    --table-row-selected: #e0f2fe;
+    color-scheme: light;
+  }
+
+  html.dark {
+    --bg-main: #0d1117;
+    --bg-card: #161b22;
+    --bg-card-hover: #1c2129;
+    --bg-panel: #161b22;
+    --bg-subtle: #12181f;
+    --bg-input: #0b0e14;
+    --border-main: #21262d;
+    --border-subtle: #1e293b;
+    --text-primary: #f3f4f6;
+    --text-secondary: #9ca3af;
+    --text-muted: #6b7280;
+    --accent-teal: #2dd4bf;
+    --accent-teal-hover: #14b8a6;
+    --accent-teal-subtle: rgba(45, 212, 191, 0.15);
+    --table-header: #12181f;
+    --table-row-hover: rgba(30, 41, 59, 0.45);
+    --table-row-selected: rgba(45, 212, 191, 0.12);
+    color-scheme: dark;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Theme utility classes */
+.bg-app-main { background-color: var(--bg-main); }
+.bg-app-card { background-color: var(--bg-card); }
+.bg-app-subtle { background-color: var(--bg-subtle); }
+.bg-app-input { background-color: var(--bg-input); }
+.border-app-main { border-color: var(--border-main); }
+.border-app-subtle { border-color: var(--border-subtle); }
+.text-app-primary { color: var(--text-primary); }
+.text-app-secondary { color: var(--text-secondary); }
+.text-app-muted { color: var(--text-muted); }
+.text-app-accent { color: var(--accent-teal); }
+
+/* Custom sleek scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-subtle);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-main);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
