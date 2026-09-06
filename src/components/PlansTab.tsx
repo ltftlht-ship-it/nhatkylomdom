@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TradingPlan, TradeRow, PreChecklistItem, SetupTagItem } from '../types';
-import { supabase, fetchPlansFromSupabase } from '../lib/supabase';
+import { supabase, fetchPlansFromSupabase, savePlanToSupabase } from '../lib/supabase';
+import { compressImage, uploadImageToSupabaseStorage } from '../utils/imageUtils';
 import { 
   Compass, 
   Plus, 
@@ -112,7 +113,7 @@ export const PlansTab: React.FC<PlansTabProps> = ({
   useEffect(() => {
     if (!showAddForm) return;
 
-    const handleWindowPaste = (e: ClipboardEvent) => {
+    const handleWindowPaste = async (e: ClipboardEvent) => {
       const items = e.clipboardData?.items;
       if (!items) return;
 
@@ -121,13 +122,18 @@ export const PlansTab: React.FC<PlansTabProps> = ({
           e.preventDefault();
           const file = items[i].getAsFile();
           if (file) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-              if (event.target?.result) {
-                setPreTradeImage(event.target.result as string);
+            try {
+              const { blob, dataUrl } = await compressImage(file, 1600, 0.78);
+              setPreTradeImage(dataUrl);
+              const cleanSym = (symbol || 'EURUSD').replace('/', '');
+              const fileName = `plan_${cleanSym}_${Date.now()}.webp`;
+              const storageUrl = await uploadImageToSupabaseStorage(blob, fileName, 'trade-images');
+              if (storageUrl) {
+                setPreTradeImage(storageUrl);
               }
-            };
-            reader.readAsDataURL(file);
+            } catch (err) {
+              console.warn('Lỗi xử lý paste ảnh plan:', err);
+            }
             break;
           }
         }
@@ -138,19 +144,24 @@ export const PlansTab: React.FC<PlansTabProps> = ({
     return () => {
       window.removeEventListener('paste', handleWindowPaste);
     };
-  }, [showAddForm]);
+  }, [showAddForm, symbol]);
 
   // Xử lý chọn file ảnh từ máy tính
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setPreTradeImage(event.target.result as string);
+      try {
+        const { blob, dataUrl } = await compressImage(file, 1600, 0.78);
+        setPreTradeImage(dataUrl);
+        const cleanSym = (symbol || 'EURUSD').replace('/', '');
+        const fileName = `plan_${cleanSym}_${Date.now()}.webp`;
+        const storageUrl = await uploadImageToSupabaseStorage(blob, fileName, 'trade-images');
+        if (storageUrl) {
+          setPreTradeImage(storageUrl);
         }
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        console.warn('Lỗi xử lý chọn file ảnh plan:', err);
+      }
     }
   };
 
@@ -174,41 +185,43 @@ export const PlansTab: React.FC<PlansTabProps> = ({
     // Lấy account_id từ Global State đang chọn trên Header
     const currentAccountId = selectedAccountId || accountId; 
 
-    const { data, error } = await supabase
-      .from('plans')
-      .insert([
-        {
-          account_id: currentAccountId,
-          symbol: planData.symbol,
-          plan_name: planData.plan_name?.trim() || `${planData.symbol} - ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`,
-          timeframe: planData.timeframe,
-          setup: planData.setup,
-          notes: planData.notes,
-          image_url: planData.imageUrl, // Ảnh paste Ctrl+V
-          checklist: planData.checklist,
-          status: 'PENDING'
-        }
-      ])
-      .select();
-
-    if (error) {
-      console.error("Lỗi khi lưu Plan xuống Supabase:", error);
+    // Đảm bảo không lưu chuỗi base64 nặng hàng megabyte vào bảng plans
+    let cleanImageUrl = planData.imageUrl || '';
+    if (cleanImageUrl.startsWith('data:image')) {
       try {
-        alert("Lưu Plan thất bại: " + error.message);
+        const res = await fetch(cleanImageUrl);
+        const blob = await res.blob();
+        const uploaded = await uploadImageToSupabaseStorage(blob, `plan_${Date.now()}.webp`, 'trade-images');
+        if (uploaded) {
+          cleanImageUrl = uploaded;
+        } else {
+          cleanImageUrl = '';
+        }
       } catch {
-        console.warn("Lưu Plan thất bại: " + error.message);
+        cleanImageUrl = '';
       }
-      return false;
     }
 
-    try {
-      alert("Đã lưu Plan thành công xuống Supabase!");
-    } catch {
-      console.log("Đã lưu Plan thành công xuống Supabase!");
+    const newPlan: TradingPlan = {
+      id: `plan-${Date.now()}`,
+      account_id: currentAccountId,
+      symbol: planData.symbol,
+      plan_name: planData.plan_name?.trim() || `${planData.symbol} - ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`,
+      timeframe: planData.timeframe,
+      setup: planData.setup,
+      notes: planData.notes,
+      image_url: cleanImageUrl,
+      checklist: planData.checklist,
+      status: 'PENDING',
+      created_at: new Date().toISOString(),
+    };
+
+    if (onAddPlan) {
+      await onAddPlan(newPlan);
+    } else {
+      await savePlanToSupabase(newPlan);
     }
 
-    // Sau khi insert thành công xuống Base mới load lại danh sách Plan từ Supabase
-    await fetchPlansFromSupabase(currentAccountId); 
     if (onReloadPlans) {
       await onReloadPlans();
     }

@@ -48,6 +48,7 @@ interface HistoryTableProps {
   plans?: TradingPlan[];
   onMapPlanToTrade?: (tradeId: string, planId: string | null, planObj?: TradingPlan) => void;
   onNavigateToPlans?: () => void;
+  onCancelPendingOrder?: (ticketOrId: string) => void;
 
   // Active filter values passed from the Hàng 1 Dropdown Filter
   selectedSymbol?: string;
@@ -73,6 +74,7 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
   plans = [],
   onMapPlanToTrade,
   onNavigateToPlans,
+  onCancelPendingOrder,
 
   // Filters from Hàng 1 Dropdown
   selectedSymbol = 'ALL',
@@ -132,7 +134,8 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
   // 2. Chuyển đổi Lệnh Chờ (Pending Orders) thành TradeGroup để hiển thị chung trên cùng 1 bảng
   const pendingTradeGroups = useMemo(() => {
     if (!pendingOrders || pendingOrders.length === 0) return [];
-    return pendingOrders.map((p, idx): TradeGroup => {
+    const activeOrders = pendingOrders.filter(p => (p.status || '').toUpperCase() !== 'CANCELLED');
+    return activeOrders.map((p, idx): TradeGroup => {
       const isSell = (p.type || '').toUpperCase().includes('SELL');
       const orderType: TradeType = isSell ? 'SELL' : 'BUY';
       const syntheticTrade: TradeRow = {
@@ -392,12 +395,24 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
                           
                           {/* Tag PENDING cho Lệnh Chờ (Kiểu dáng & Màu sắc đồng bộ với Tag NOISE) */}
                           {isPending && (
-                            <span 
-                              className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 border border-amber-500/40 text-amber-400 font-sans font-bold"
-                              title="Lệnh chờ (Pending Order) chưa khớp từ MT5"
-                            >
-                              PENDING
-                            </span>
+                            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                              <span 
+                                className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 border border-amber-500/40 text-amber-400 font-sans font-bold"
+                                title="Lệnh chờ (Pending Order) chưa khớp từ MT5"
+                              >
+                                PENDING
+                              </span>
+                              {onCancelPendingOrder && (
+                                <button
+                                  type="button"
+                                  onClick={() => onCancelPendingOrder(group.ticket)}
+                                  className="text-[10px] px-1.5 py-0.2 rounded bg-rose-500/15 hover:bg-rose-500/30 border border-rose-500/40 text-rose-400 font-sans font-bold transition-all cursor-pointer active:scale-95"
+                                  title="Hủy lệnh chờ này trên Supabase"
+                                >
+                                  Hủy
+                                </button>
+                              )}
+                            </div>
                           )}
 
                           {/* Tag NOISE cho Lệnh Rác */}
@@ -668,7 +683,7 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
 
                       {/* KL */}
                       <td className="py-2.5 px-3 text-right font-semibold text-[var(--text-primary)]">
-                        {group.total_volume.toFixed(2)}
+                        {(group.total_volume ?? 0).toFixed(2)}
                       </td>
 
                       {/* GIÁ VÀO */}
@@ -684,7 +699,7 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
                       {/* PIP SL CHUẨN HÓA */}
                       <td 
                         className="py-2.5 px-3 text-right text-[var(--text-secondary)] font-sans font-medium"
-                        title={group.initial_sl && group.initial_sl > 0 ? `Price Risk: ${Math.abs(group.avg_open_price - group.initial_sl).toFixed(2)} | SL: ${group.initial_sl}` : 'Không đặt SL (Mặc định Risk $100)'}
+                        title={group.initial_sl && group.initial_sl > 0 ? `Price Risk: ${Math.abs((group.avg_open_price ?? 0) - (group.initial_sl ?? 0)).toFixed(2)} | SL: ${group.initial_sl}` : 'Không đặt SL (Mặc định Risk $100)'}
                       >
                         {formatPipSl(group.pip_sl, group.symbol, group.initial_sl)}
                       </td>
@@ -729,13 +744,13 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
                           <span className="text-[var(--text-muted)]">-</span>
                         ) : (
                           <span className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold ${
-                            group.weighted_rr > 0
+                            (group.weighted_rr ?? 0) > 0
                               ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                              : group.weighted_rr < 0
+                              : (group.weighted_rr ?? 0) < 0
                               ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
                               : 'bg-[var(--bg-subtle)] text-[var(--text-muted)] border border-[var(--border-main)]'
                           }`}>
-                            {group.weighted_rr > 0 ? `+${group.weighted_rr.toFixed(2)}R` : `${group.weighted_rr.toFixed(2)}R`}
+                            {group.weighted_rr != null && !isNaN(Number(group.weighted_rr)) ? (Number(group.weighted_rr) > 0 ? `+${Number(group.weighted_rr).toFixed(2)}R` : `${Number(group.weighted_rr).toFixed(2)}R`) : '-'}
                           </span>
                         )}
                       </td>
@@ -744,7 +759,7 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
                       <td className={`py-2.5 px-3 text-right font-bold ${
                         isPending ? 'text-[var(--text-muted)]' : group.net_pnl > 0 ? 'text-emerald-400' : group.net_pnl < 0 ? 'text-rose-400' : 'text-[var(--text-muted)]'
                       }`}>
-                        {isPending ? '-' : (group.pnl_percentage > 0 ? `+${group.pnl_percentage.toFixed(2)}%` : `${group.pnl_percentage.toFixed(2)}%`)}
+                        {isPending ? '-' : (group.pnl_percentage != null && !isNaN(Number(group.pnl_percentage)) ? (Number(group.pnl_percentage) > 0 ? `+${Number(group.pnl_percentage).toFixed(2)}%` : `${Number(group.pnl_percentage).toFixed(2)}%`) : '-')}
                       </td>
 
                       {/* NET PNL ($) */}
@@ -826,7 +841,7 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
                             })()}
                           </td>
                           <td className="py-2 px-3 text-center text-[var(--text-secondary)]">{child.type}</td>
-                          <td className="py-2 px-3 text-right font-semibold text-[var(--text-secondary)]">{child.volume.toFixed(2)}</td>
+                          <td className="py-2 px-3 text-right font-semibold text-[var(--text-secondary)]">{(child.volume ?? 0).toFixed(2)}</td>
                           <td className="py-2 px-3 text-right text-[var(--text-secondary)]">{child.open_price.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                           <td className="py-2 px-3 text-right text-[var(--text-secondary)]">{child.close_price.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                           <td className="py-2 px-3 text-right font-sans text-[var(--text-secondary)]">{formatPipSl(child.pip_sl, child.symbol, child.initial_sl)}</td>
@@ -840,13 +855,13 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
                           </td>
                           <td className="py-2 px-3 text-center">
                             <span className={`font-mono text-[10px] font-bold ${
-                              child.weighted_rr > 0 ? 'text-emerald-400' : child.weighted_rr < 0 ? 'text-rose-400' : 'text-[var(--text-muted)]'
+                              (child.weighted_rr ?? 0) > 0 ? 'text-emerald-400' : (child.weighted_rr ?? 0) < 0 ? 'text-rose-400' : 'text-[var(--text-muted)]'
                             }`}>
-                              {child.weighted_rr > 0 ? `+${child.weighted_rr.toFixed(2)}R` : `${child.weighted_rr.toFixed(2)}R`}
+                              {child.weighted_rr != null && !isNaN(Number(child.weighted_rr)) ? (Number(child.weighted_rr) > 0 ? `+${Number(child.weighted_rr).toFixed(2)}R` : `${Number(child.weighted_rr).toFixed(2)}R`) : '-'}
                             </span>
                           </td>
                           <td className={`py-2 px-3 text-right ${child.net_pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                            {child.pnl_percentage ? `${child.pnl_percentage > 0 ? '+' : ''}${child.pnl_percentage.toFixed(2)}%` : '-'}
+                            {child.pnl_percentage != null && !isNaN(Number(child.pnl_percentage)) ? `${Number(child.pnl_percentage) > 0 ? '+' : ''}${Number(child.pnl_percentage).toFixed(2)}%` : '-'}
                           </td>
                           <td className={`py-2 px-3 text-right font-semibold ${child.net_pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                             {formatCurrency(child.net_pnl)}

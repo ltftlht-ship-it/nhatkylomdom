@@ -41,6 +41,14 @@ export interface TradeRow {
   plan_id: string | null;
   plan_name?: string; // Tên Plan được map
 
+  // MFE & MAE Data (Thu thập từ High / Low của EA và tính toán chuẩn xác)
+  high?: number | null; // Mức giá cao nhất sau Entry
+  low?: number | null; // Mức giá thấp nhất sau Entry
+  mfe_price?: number | null; // Maximum Favorable Excursion theo giá
+  mae_price?: number | null; // Maximum Adverse Excursion theo giá
+  mfe_r?: number | null; // MFE quy đổi theo R (nếu có Initial SL)
+  mae_r?: number | null; // MAE quy đổi theo R (nếu có Initial SL)
+
   // Additional detail fields
   plan_pnl?: number; // PnL Kế hoạch đặt ra (USD)
   status: TradeStatus;
@@ -99,7 +107,7 @@ export interface PendingOrder {
   plan_id: string | null;
   plan_title?: string;
   notes?: string;
-  status: 'PENDING';
+  status: 'PENDING' | 'CANCELLED';
 }
 
 export interface PreChecklistItem {

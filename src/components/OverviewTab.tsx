@@ -25,8 +25,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 }) => {
   const winCount = trades.filter(t => t.result === 'Win').length;
   const lossCount = trades.filter(t => t.result === 'Loss').length;
-  const totalTrades = trades.length || 1;
-  const winRate = ((winCount / totalTrades) * 100).toFixed(1);
+  const totalTrades = trades.length || 0;
+  const winRate = totalTrades > 0 ? ((winCount / totalTrades) * 100).toFixed(1) : '0.0';
 
   // Sessions breakdown
   const tokyoTrades = trades.filter(t => t.session === 'Á').length;
@@ -41,22 +41,22 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           <span className="text-xs text-slate-500 font-medium block">Số dư hiện tại</span>
           <div className="flex items-baseline gap-2 mt-1">
             <span className="text-2xl font-mono font-black text-white">
-              ${activeAccount.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              ${(activeAccount.balance ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </span>
-            <span className="text-xs text-slate-500 font-mono">Gốc: ${activeAccount.initial_balance.toLocaleString()}</span>
+            <span className="text-xs text-slate-500 font-mono">Gốc: ${(activeAccount.initial_balance ?? 0).toLocaleString()}</span>
           </div>
         </div>
 
         <div className="p-4 rounded-xl bg-[#111622] border border-slate-800">
           <span className="text-xs text-slate-500 font-medium block">Lãi/Lỗ ròng (Net PnL)</span>
           <div className="flex items-baseline gap-2 mt-1">
-            <span className={`text-2xl font-mono font-black ${activeAccount.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {activeAccount.pnl >= 0 ? '+' : '-'}${Math.abs(activeAccount.pnl).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            <span className={`text-2xl font-mono font-black ${(activeAccount.pnl ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {(activeAccount.pnl ?? 0) >= 0 ? '+' : '-'}${Math.abs(activeAccount.pnl ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </span>
             <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
-              activeAccount.pnl >= 0 ? 'bg-emerald-950 text-emerald-400' : 'bg-rose-950 text-rose-400'
+              (activeAccount.pnl ?? 0) >= 0 ? 'bg-emerald-950 text-emerald-400' : 'bg-rose-950 text-rose-400'
             }`}>
-              {((activeAccount.pnl / activeAccount.initial_balance) * 100).toFixed(2)}%
+              {activeAccount.initial_balance > 0 ? (((activeAccount.pnl ?? 0) / activeAccount.initial_balance) * 100).toFixed(2) : '0.00'}%
             </span>
           </div>
         </div>

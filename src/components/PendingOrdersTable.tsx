@@ -12,7 +12,8 @@ import {
   Zap, 
   Check, 
   AlertCircle,
-  Tag
+  Tag,
+  Trash2
 } from 'lucide-react';
 
 interface PendingOrdersTableProps {
@@ -21,6 +22,7 @@ interface PendingOrdersTableProps {
   timezoneOffset?: number;
   onAssignPlan: (orderId: string, planId: string) => void;
   onExecuteOrder: (orderId: string) => void;
+  onCancelOrder?: (orderId: string) => void;
 }
 
 export const PendingOrdersTable: React.FC<PendingOrdersTableProps> = ({
@@ -29,8 +31,11 @@ export const PendingOrdersTable: React.FC<PendingOrdersTableProps> = ({
   timezoneOffset = 0,
   onAssignPlan,
   onExecuteOrder,
+  onCancelOrder,
 }) => {
   const [activePlanDropdown, setActivePlanDropdown] = useState<string | null>(null);
+
+  const activeOrders = orders.filter(o => (o.status || '').toUpperCase() !== 'CANCELLED');
 
   return (
     <div className="flex flex-col h-full">
@@ -66,7 +71,7 @@ export const PendingOrdersTable: React.FC<PendingOrdersTableProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-[#1e293b]/60">
-            {orders.length === 0 ? (
+            {activeOrders.length === 0 ? (
               <tr>
                 <td colSpan={10} className="py-12 text-center text-slate-500">
                   <Clock className="w-8 h-8 mx-auto mb-2 opacity-40" />
@@ -74,7 +79,7 @@ export const PendingOrdersTable: React.FC<PendingOrdersTableProps> = ({
                 </td>
               </tr>
             ) : (
-              orders.map(order => {
+              activeOrders.map(order => {
                 const assignedPlan = plans.find(p => p.id === order.plan_id);
                 const isBuy = order.type === 'BUY';
 
@@ -99,7 +104,7 @@ export const PendingOrdersTable: React.FC<PendingOrdersTableProps> = ({
                       </span>
                     </td>
                     <td className="py-3 px-3 text-right font-bold text-slate-100">
-                      {order.volume.toFixed(2)} Lot
+                      {(order.volume ?? 0).toFixed(2)} Lot
                     </td>
                     <td className="py-3 px-3 text-right text-cyan-300 font-bold">
                       {order.price.toLocaleString('en-US', { minimumFractionDigits: 2 })}
@@ -168,15 +173,29 @@ export const PendingOrdersTable: React.FC<PendingOrdersTableProps> = ({
                       )}
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <button
-                        type="button"
-                        onClick={() => onExecuteOrder(order.id)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition-all active:scale-95 shadow-sm"
-                        title="Mô phỏng khớp lệnh MT5 và chuyển sang Bảng Lịch Sử chính"
-                      >
-                        <Zap className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>Mô phỏng Khớp</span>
-                      </button>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => onExecuteOrder(order.id)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition-all active:scale-95 shadow-sm cursor-pointer"
+                          title="Mô phỏng khớp lệnh MT5 và chuyển sang Bảng Lịch Sử chính"
+                        >
+                          <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Khớp</span>
+                        </button>
+
+                        {onCancelOrder && (
+                          <button
+                            type="button"
+                            onClick={() => onCancelOrder(order.id)}
+                            className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 text-xs font-bold transition-all active:scale-95 shadow-sm cursor-pointer"
+                            title="Hủy lệnh chờ và cập nhật trạng thái CANCELLED trên Supabase"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                            <span>Hủy</span>
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

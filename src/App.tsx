@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { 
   TradeRow, 
   TradeType,
@@ -38,7 +38,9 @@ import {
   fetchPlansFromSupabase,
   savePlanToSupabase,
   updatePlanStatusOnSupabase,
-  updateTradeMappingOnSupabase
+  updateTradeMappingOnSupabase,
+  updateTradeJournalOnSupabase,
+  cancelPendingOrderOnSupabase
 } from './lib/supabase';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -128,6 +130,8 @@ export default function App() {
 
   // Active Selected Trade for Detail Card
   const [selectedTradeId, setSelectedTradeId] = useState<string>('');
+  const [journalSaveStatus, setJournalSaveStatus] = useState<string>('Tự động lưu khi nhập');
+  const debounceTimersRef = useRef<Record<string, NodeJS.Timeout>>({});
 
   // Checklists & Setup items
   const [preChecklist, setPreChecklist] = useState<PreChecklistItem[]>(DEFAULT_PRE_CHECKLIST);
@@ -241,7 +245,7 @@ export default function App() {
         setSupabaseStatus('connected');
       }
     } catch (err) {
-      console.error('Lỗi nạp trades từ Supabase:', err);
+      console.warn('Không thể nạp trades từ Supabase:', err);
       setTrades([]);
       setSelectedTradeId('');
       setSupabaseStatus('error');
@@ -268,7 +272,7 @@ export default function App() {
       }
       return remotePlans;
     } catch (err) {
-      console.error('Lỗi khi nạp danh sách Plans:', err);
+      console.warn('Không thể nạp danh sách Plans:', err);
       setPlans([]);
       return [];
     }
@@ -290,12 +294,12 @@ export default function App() {
 
     return {
       ...activeAccount,
-      balance: Number(latestRunningBalance.toFixed(2)),
-      pnl: Number(totalNetPnl.toFixed(2)),
+      balance: Number((latestRunningBalance ?? 0).toFixed(2)),
+      pnl: Number((totalNetPnl ?? 0).toFixed(2)),
       wins: stats.wins,
       losses: stats.losses,
       breakeven: stats.breakeven,
-      win_rate: Number(stats.winRate.toFixed(1)),
+      win_rate: Number((stats.winRate ?? 0).toFixed(1)),
       total_rr: stats.totalRR,
       noise_count: stats.noiseTradesCount,
     };
@@ -363,10 +367,73 @@ export default function App() {
     setAccounts(prev => prev.map(a => a.id === selectedAccountId ? { ...a, name: newName } : a));
   };
 
-  // Update a trade in list
-  const handleUpdateTrade = (updated: TradeRow) => {
+  // Update a trade in list with 300ms debounced persistence to Supabase
+  const handleUpdateTrade = useCallback((updated: TradeRow) => {
+    // 1. Phản hồi UI tức thì trong React state
     setTrades(prev => prev.map(t => t.id === updated.id ? updated : t));
-  };
+
+    // 2. Debounce 300ms ghi nhận xuống Supabase
+    setJournalSaveStatus('Đang lưu...');
+    const tradeKey = updated.id || String(updated.ticket);
+
+    if (debounceTimersRef.current[tradeKey]) {
+      clearTimeout(debounceTimersRef.current[tradeKey]);
+    }
+
+    debounceTimersRef.current[tradeKey] = setTimeout(async () => {
+      try {
+        const success = await updateTradeJournalOnSupabase(
+          updated.id,
+          updated.ticket,
+          {
+            timeframe: updated.timeframe,
+            setup: updated.setup,
+            setups: updated.setups,
+            notes: updated.notes,
+            pre_checklist_ids: updated.pre_checklist_ids,
+            post_checklist_ids: updated.post_checklist_ids,
+            plan_pnl: updated.plan_pnl,
+            lost_profit: updated.lost_profit,
+            image_url_1: updated.image_url_1 || updated.htf_image_url,
+            htf_image_url: updated.htf_image_url || updated.image_url_1,
+            image_base64: updated.image_base64 || updated.ltf_image_url,
+            ltf_image_url: updated.ltf_image_url || updated.image_base64,
+            plan_id: updated.plan_id,
+            plan_name: updated.plan_name,
+          },
+          updated.account_id || selectedAccountId
+        );
+
+        if (success) {
+          setJournalSaveStatus('Đã lưu Supabase');
+          setTimeout(() => {
+            setJournalSaveStatus('Tự động lưu khi nhập');
+          }, 2000);
+        } else {
+          setJournalSaveStatus('Chưa lưu được (Offline)');
+        }
+      } catch (err) {
+        console.error('Lỗi khi lưu journal trade:', err);
+        setJournalSaveStatus('Lỗi khi lưu');
+      }
+    }, 300);
+  }, [selectedAccountId]);
+
+  // Hủy lệnh chờ và đồng bộ trạng thái CANCELLED xuống Supabase
+  const handleCancelPendingOrder = useCallback(async (ticketOrId: string) => {
+    const cleanTicket = String(ticketOrId).replace(/^pending-/, '');
+
+    // 1. Cập nhật state local ngay lập tức
+    setPendingOrders(prev => prev.filter(p => String(p.ticket) !== cleanTicket && p.id !== ticketOrId));
+    setTrades(prev => prev.map(t => String(t.ticket) === cleanTicket ? { ...t, status: 'CANCELLED' as any } : t));
+
+    // 2. Cập nhật trạng thái CANCELLED trên Supabase
+    try {
+      await cancelPendingOrderOnSupabase(cleanTicket, selectedAccountId);
+    } catch (err) {
+      console.error('Lỗi khi hủy lệnh chờ trên Supabase:', err);
+    }
+  }, [selectedAccountId]);
 
   // Assign plan to pending order
   const handleAssignPlanToPendingOrder = (orderId: string, planId: string) => {
@@ -445,7 +512,7 @@ export default function App() {
     try {
       await savePlanToSupabase(newPlan);
     } catch (err) {
-      console.error('Lỗi khi lưu Plan lên Supabase:', err);
+      console.warn('Không thể lưu Plan lên Supabase (đã lưu LocalStorage):', err);
     }
   };
 
@@ -530,7 +597,20 @@ export default function App() {
         notes: selectedPlan.notes,
         pre_checklist_ids: selectedPlan.checklist,
         image_url_1: selectedPlan.image_url,
-      });
+      }, targetTrade.account_id || selectedAccountId);
+    } else {
+      const targetPending = pendingOrders.find(p => p.id === tradeId || `pending-${p.ticket}` === tradeId || String(p.ticket) === tradeId);
+      if (targetPending) {
+        await updateTradeMappingOnSupabase(targetPending.id, targetPending.ticket, {
+          plan_id: selectedPlan.id,
+          plan_name: selectedPlan.plan_name || selectedPlan.title,
+          timeframe: selectedPlan.timeframe,
+          setup: selectedPlan.setup,
+          notes: selectedPlan.notes,
+          pre_checklist_ids: selectedPlan.checklist,
+          image_url_1: selectedPlan.image_url,
+        }, selectedAccountId);
+      }
     }
     await updatePlanStatusOnSupabase(selectedPlan.id, 'EXECUTED');
   };
@@ -633,6 +713,7 @@ export default function App() {
                   onSync={() => loadTrades(selectedAccountId)}
                   onOpenSettings={() => setIsSettingsOpen(true)}
                   onMapPlanToTrade={handleMapPlanToTrade}
+                  onCancelPendingOrder={handleCancelPendingOrder}
                   onNavigateToPlans={() => setCurrentTab('ke-hoach')}
                   selectedSymbol={selectedSymbol}
                   selectedType={selectedType}
@@ -654,6 +735,7 @@ export default function App() {
                   postMistakeItems={postMistakes}
                   setupTags={setupTags}
                   timezoneOffset={settings.timezone_offset_hours}
+                  saveStatusText={journalSaveStatus}
                   onUpdateTrade={handleUpdateTrade}
                   onMapPlanToTrade={handleMapPlanToTrade}
                   onOpenSettingsModal={() => setIsSettingsOpen(true)}

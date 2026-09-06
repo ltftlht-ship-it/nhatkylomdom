@@ -14,6 +14,7 @@ import {
   formatDateTimeWithOffset,
   getSavedTimezoneOffset
 } from '../utils/tradeCalculations';
+import { compressImage, uploadImageToSupabaseStorage } from '../utils/imageUtils';
 import { fetchPlansForTrade } from '../lib/supabase';
 import { 
   FolderOpen, 
@@ -45,6 +46,7 @@ interface TradeDetailCardProps {
   postMistakeItems: PostMistakeItem[];
   setupTags: SetupTagItem[];
   timezoneOffset?: number;
+  saveStatusText?: string;
   onUpdateTrade: (updated: TradeRow) => void;
   onMapPlanToTrade?: (tradeId: string, planId: string | null, planObj?: TradingPlan) => void;
   onOpenSettingsModal: () => void;
@@ -59,6 +61,7 @@ export const TradeDetailCard: React.FC<TradeDetailCardProps> = ({
   postMistakeItems,
   setupTags,
   timezoneOffset,
+  saveStatusText,
   onUpdateTrade,
   onMapPlanToTrade,
   onOpenSettingsModal,
@@ -115,42 +118,66 @@ export const TradeDetailCard: React.FC<TradeDetailCardProps> = ({
   const postTradeImage = trade.image_base64 || trade.ltf_image_url || '';
 
   // Handle image upload from file picker
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'HTF' | 'LTF') => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'HTF' | 'LTF') => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64 = event.target?.result as string;
+      try {
+        const { blob, dataUrl } = await compressImage(file, 1600, 0.78);
+        // Show immediate local preview
         if (type === 'HTF') {
-          onUpdateTrade({ ...trade, image_url_1: base64, htf_image_url: base64 });
+          onUpdateTrade({ ...trade, image_url_1: dataUrl, htf_image_url: dataUrl });
         } else {
-          onUpdateTrade({ ...trade, image_base64: base64, ltf_image_url: base64 });
+          onUpdateTrade({ ...trade, image_base64: dataUrl, ltf_image_url: dataUrl });
         }
         triggerSaveNotification();
-      };
-      reader.readAsDataURL(file);
+
+        // Background upload to Supabase Storage (bucket: trade-images)
+        const cleanTicket = trade.ticket || '0';
+        const fileName = `trade_${cleanTicket}_${type.toLowerCase()}_${Date.now()}.webp`;
+        const storageUrl = await uploadImageToSupabaseStorage(blob, fileName, 'trade-images');
+        if (storageUrl) {
+          if (type === 'HTF') {
+            onUpdateTrade({ ...trade, image_url_1: storageUrl, htf_image_url: storageUrl });
+          } else {
+            onUpdateTrade({ ...trade, image_base64: storageUrl, ltf_image_url: storageUrl });
+          }
+        }
+      } catch (err) {
+        console.warn('Lỗi xử lý file ảnh:', err);
+      }
     }
   };
 
   // Handle Ctrl+V paste on image box
-  const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>, type: 'HTF' | 'LTF') => {
+  const handlePaste = async (e: React.ClipboardEvent<HTMLDivElement>, type: 'HTF' | 'LTF') => {
     const items = e.clipboardData.items;
     for (let i = 0; i < items.length; i++) {
       if (items[i].type.indexOf('image') !== -1) {
-        const blob = items[i].getAsFile();
-        if (blob) {
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            const base64 = event.target?.result as string;
+        const file = items[i].getAsFile();
+        if (file) {
+          e.preventDefault();
+          try {
+            const { blob, dataUrl } = await compressImage(file, 1600, 0.78);
             if (type === 'HTF') {
-              onUpdateTrade({ ...trade, image_url_1: base64, htf_image_url: base64 });
+              onUpdateTrade({ ...trade, image_url_1: dataUrl, htf_image_url: dataUrl });
             } else {
-              onUpdateTrade({ ...trade, image_base64: base64, ltf_image_url: base64 });
+              onUpdateTrade({ ...trade, image_base64: dataUrl, ltf_image_url: dataUrl });
             }
             triggerSaveNotification();
-          };
-          reader.readAsDataURL(blob);
-          e.preventDefault();
+
+            const cleanTicket = trade.ticket || '0';
+            const fileName = `trade_${cleanTicket}_${type.toLowerCase()}_${Date.now()}.webp`;
+            const storageUrl = await uploadImageToSupabaseStorage(blob, fileName, 'trade-images');
+            if (storageUrl) {
+              if (type === 'HTF') {
+                onUpdateTrade({ ...trade, image_url_1: storageUrl, htf_image_url: storageUrl });
+              } else {
+                onUpdateTrade({ ...trade, image_base64: storageUrl, ltf_image_url: storageUrl });
+              }
+            }
+          } catch (err) {
+            console.warn('Lỗi xử lý dán ảnh:', err);
+          }
           break;
         }
       }
@@ -623,7 +650,7 @@ export const TradeDetailCard: React.FC<TradeDetailCardProps> = ({
             <div className="grid grid-cols-4 gap-2 text-center text-xs">
               <div className="p-2 rounded bg-slate-900/80 border border-slate-800/80">
                 <span className="text-[10px] text-slate-500 block">Khối lượng (Lot)</span>
-                <span className="font-mono font-bold text-slate-200">{trade.volume.toFixed(2)} Lot</span>
+                <span className="font-mono font-bold text-slate-200">{(trade.volume ?? 0).toFixed(2)} Lot</span>
               </div>
               <div className="p-2 rounded bg-slate-900/80 border border-slate-800/80">
                 <span className="text-[10px] text-slate-500 block">Thời gian giữ</span>
@@ -632,7 +659,7 @@ export const TradeDetailCard: React.FC<TradeDetailCardProps> = ({
               <div className="p-2 rounded bg-slate-900/80 border border-slate-800/80">
                 <span className="text-[10px] text-slate-500 block">% Lợi nhuận</span>
                 <span className={`font-mono font-bold ${trade.net_pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {trade.pnl_percentage ? `${trade.pnl_percentage > 0 ? '+' : ''}${trade.pnl_percentage.toFixed(2)}%` : '-'}
+                  {trade.pnl_percentage != null && !isNaN(Number(trade.pnl_percentage)) ? `${Number(trade.pnl_percentage) > 0 ? '+' : ''}${Number(trade.pnl_percentage).toFixed(2)}%` : '-'}
                 </span>
               </div>
               <div className="p-2 rounded bg-slate-900/80 border border-slate-800/80">
@@ -687,6 +714,37 @@ export const TradeDetailCard: React.FC<TradeDetailCardProps> = ({
                 </select>
               </div>
             </div>
+
+            {/* Hàng 3: MFE / MAE Excursion Metrics (tính từ High/Low thực tế của MT5) */}
+            {(trade.mfe_r != null || trade.mae_r != null || trade.high != null || trade.mfe_price != null) && (
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1.5 border-t border-slate-800 text-[11px] font-mono">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-500 font-sans text-[10px]">MFE:</span>
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 font-bold">
+                      {trade.mfe_r != null && !isNaN(Number(trade.mfe_r)) ? `+${Number(trade.mfe_r).toFixed(2)}R` : '-'}
+                    </span>
+                    {trade.mfe_price != null && !isNaN(Number(trade.mfe_price)) && (
+                      <span className="text-slate-400 text-[10px]">(${Number(trade.mfe_price).toFixed(2)})</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-500 font-sans text-[10px]">MAE:</span>
+                    <span className="px-1.5 py-0.5 rounded bg-rose-950/60 border border-rose-500/40 text-rose-300 font-bold">
+                      {trade.mae_r != null && !isNaN(Number(trade.mae_r)) ? `${Number(trade.mae_r).toFixed(2)}R` : '-'}
+                    </span>
+                    {trade.mae_price != null && !isNaN(Number(trade.mae_price)) && (
+                      <span className="text-slate-400 text-[10px]">(${Number(trade.mae_price).toFixed(2)})</span>
+                    )}
+                  </div>
+                </div>
+                {(trade.high != null || trade.low != null) && (
+                  <div className="text-[10px] text-slate-500 font-mono">
+                    H: <span className="text-slate-300">{trade.high ?? '-'}</span> | L: <span className="text-slate-300">{trade.low ?? '-'}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Ô GHI CHÚ LỆNH */}
@@ -697,7 +755,7 @@ export const TradeDetailCard: React.FC<TradeDetailCardProps> = ({
                 Ghi chú lệnh
               </span>
               <span className="text-[10px] text-slate-500 italic">
-                {saveStatus}
+                {saveStatusText || saveStatus}
               </span>
             </div>
             <textarea

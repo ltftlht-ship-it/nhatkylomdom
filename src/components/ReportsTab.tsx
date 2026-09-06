@@ -105,7 +105,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({ trades, activeAccount })
           </div>
           <div className="flex items-baseline gap-2 mt-2">
             <span className="text-2xl font-mono font-black text-cyan-400">
-              {stats.winRate.toFixed(1)}%
+              {(stats.winRate ?? 0).toFixed(1)}%
             </span>
             <span className="text-xs font-mono text-slate-400">
               ({stats.wins}W - {stats.losses}L{stats.breakeven > 0 ? ` - ${stats.breakeven}BE` : ''})
@@ -123,8 +123,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({ trades, activeAccount })
             <TrendingUp className="w-4 h-4 text-emerald-400" />
           </div>
           <div className="flex items-baseline gap-2 mt-2">
-            <span className={`text-2xl font-mono font-black ${stats.totalRR >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {stats.totalRR > 0 ? `+${stats.totalRR.toFixed(2)}R` : `${stats.totalRR.toFixed(2)}R`}
+            <span className={`text-2xl font-mono font-black ${(stats.totalRR ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {(stats.totalRR ?? 0) > 0 ? `+${(stats.totalRR ?? 0).toFixed(2)}R` : `${(stats.totalRR ?? 0).toFixed(2)}R`}
             </span>
           </div>
           <span className="text-[11px] text-slate-500 block mt-1">
@@ -140,7 +140,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({ trades, activeAccount })
           </div>
           <div className="flex items-baseline gap-2 mt-2">
             <span className="text-2xl font-mono font-black text-white">
-              {stats.profitFactor >= 99 ? '99.9' : stats.profitFactor.toFixed(2)}
+              {(stats.profitFactor ?? 0) >= 99 ? '99.9' : (stats.profitFactor ?? 0).toFixed(2)}
             </span>
           </div>
           <span className="text-[11px] text-slate-500 block mt-1">
@@ -156,7 +156,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({ trades, activeAccount })
           </div>
           <div className="flex items-baseline gap-2 mt-2">
             <span className="text-2xl font-mono font-black text-emerald-400">
-              1 : {stats.realizedRR.toFixed(2)}
+              1 : {(stats.realizedRR ?? 0).toFixed(2)}
             </span>
           </div>
           <span className="text-[11px] text-slate-500 block mt-1">

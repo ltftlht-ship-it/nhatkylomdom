@@ -233,10 +233,103 @@ export function calculateActualRR(netPnl: number, risk1R: number): number {
   return Number((netPnl / risk1R).toFixed(2));
 }
 
-export function formatRR(rr: number): string {
-  if (isNaN(rr) || !isFinite(rr)) return '0.00R';
-  const sign = rr > 0 ? '+' : '';
-  return `${sign}${rr.toFixed(2)}R`;
+export function formatRR(rr: number | null | undefined): string {
+  if (rr == null || isNaN(Number(rr)) || !isFinite(Number(rr))) return '0.00R';
+  const num = Number(rr);
+  const sign = num > 0 ? '+' : '';
+  return `${sign}${num.toFixed(2)}R`;
+}
+
+/**
+ * ====================================================================
+ * TÍNH TOÁN MFE & MAE CHUẨN XÁC THEO BUY / SELL:
+ * - MFE (Maximum Favorable Excursion): Mức giá đi thuận lợi nhất sau Entry.
+ * - MAE (Maximum Adverse Excursion): Mức giá đi ngược bất lợi nhất sau Entry.
+ *
+ * BUY:
+ *   favorable = highest price sau entry (High)
+ *   adverse = lowest price sau entry (Low)
+ *   mfe_price = favorable - open_price
+ *   mae_price = open_price - adverse
+ *
+ * SELL:
+ *   favorable = lowest price sau entry (Low)
+ *   adverse = highest price sau entry (High)
+ *   mfe_price = open_price - favorable
+ *   mae_price = adverse - open_price
+ *
+ * Quy đổi sang R (nếu có Initial SL > 0 và Price Risk > 0):
+ *   Price Risk = |open_price - initial_sl|
+ *   mfe_r = mfe_price / Price Risk
+ *   mae_r = mae_price / Price Risk
+ *
+ * Nếu High/Low không có hoặc null -> trả về null, KHÔNG giả định số liệu!
+ * ====================================================================
+ */
+export function calculateMfeMae(
+  openPrice: number,
+  initialSl: number,
+  type: 'BUY' | 'SELL',
+  high?: number | null,
+  low?: number | null
+): {
+  high: number | null;
+  low: number | null;
+  mfe_price: number | null;
+  mae_price: number | null;
+  mfe_r: number | null;
+  mae_r: number | null;
+} {
+  const hasHigh = high !== undefined && high !== null && !isNaN(Number(high)) && Number(high) > 0;
+  const hasLow = low !== undefined && low !== null && !isNaN(Number(low)) && Number(low) > 0;
+
+  if (!hasHigh && !hasLow) {
+    return {
+      high: null,
+      low: null,
+      mfe_price: null,
+      mae_price: null,
+      mfe_r: null,
+      mae_r: null,
+    };
+  }
+
+  const numHigh = hasHigh ? Number(high) : openPrice;
+  const numLow = hasLow ? Number(low) : openPrice;
+
+  let mfePrice: number;
+  let maePrice: number;
+
+  if (type === 'BUY') {
+    mfePrice = Math.max(0, numHigh - openPrice);
+    maePrice = Math.max(0, openPrice - numLow);
+  } else {
+    mfePrice = Math.max(0, openPrice - numLow);
+    maePrice = Math.max(0, numHigh - openPrice);
+  }
+
+  mfePrice = Number(mfePrice.toFixed(2));
+  maePrice = Number(maePrice.toFixed(2));
+
+  let mfeR: number | null = null;
+  let maeR: number | null = null;
+
+  if (initialSl > 0 && openPrice > 0) {
+    const priceRisk = Math.abs(openPrice - initialSl);
+    if (priceRisk > 0) {
+      mfeR = Number((mfePrice / priceRisk).toFixed(2));
+      maeR = Number((maePrice / priceRisk).toFixed(2));
+    }
+  }
+
+  return {
+    high: hasHigh ? numHigh : null,
+    low: hasLow ? numLow : null,
+    mfe_price: mfePrice,
+    mae_price: maePrice,
+    mfe_r: mfeR,
+    mae_r: maeR,
+  };
 }
 
 /**
@@ -450,6 +543,25 @@ export function processSupabaseClosedTrades(
 
     const session = determineSession(t.open_time || '', timezoneOffset);
 
+    // MFE & MAE: Trích xuất High / Low do EA gửi về và tính toán chuẩn xác theo BUY / SELL
+    const rawHigh = (t as any).high ?? (t as any).trade_high ?? (t as any).max_price ?? (t as any).highest_price;
+    const rawLow = (t as any).low ?? (t as any).trade_low ?? (t as any).min_price ?? (t as any).lowest_price;
+    const mfeMae = calculateMfeMae(openPrice, initialSl, tradeType, rawHigh, rawLow);
+
+    // Xử lý checklist kỷ luật & lỗi tâm lý (hỗ trợ cả schema pre_checklist_ids/post_checklist_ids và checklist/mistake_tags)
+    const preChecklistIds = Array.isArray(t.pre_checklist_ids)
+      ? t.pre_checklist_ids
+      : (Array.isArray((t as any).checklist) ? (t as any).checklist : []);
+
+    const postChecklistIds = Array.isArray(t.post_checklist_ids)
+      ? t.post_checklist_ids
+      : (Array.isArray((t as any).mistake_tags) ? (t as any).mistake_tags : []);
+
+    // Xử lý lost_profit từ database hoặc tự động tính nếu có plan_pnl
+    const lostProfit = t.lost_profit !== undefined && t.lost_profit !== null
+      ? Number(t.lost_profit)
+      : (t.plan_pnl && t.plan_pnl > netPnl ? Number((t.plan_pnl - netPnl).toFixed(2)) : 0);
+
     return {
       id: t.id ? String(t.id) : `sb-${t.ticket || index}-${index}`,
       ticket: String(t.ticket || '000000'),
@@ -472,7 +584,7 @@ export function processSupabaseClosedTrades(
       risk_1r_usd: risk1rUsd,
       net_pnl: netPnl,
       weighted_rr: weightedRr,
-      lost_profit: 0,
+      lost_profit: lostProfit,
 
       timeframe: (t.timeframe as any) || 'M15',
       session,
@@ -480,12 +592,20 @@ export function processSupabaseClosedTrades(
       image_base64: t.image_base64 || t.ltf_image_url || '',
       htf_image_url: t.image_url_1 || t.htf_image_url || '',
       ltf_image_url: t.image_base64 || t.ltf_image_url || '',
-      pre_checklist_ids: Array.isArray(t.pre_checklist_ids) ? t.pre_checklist_ids : [],
-      post_checklist_ids: Array.isArray(t.post_checklist_ids) ? t.post_checklist_ids : [],
+      pre_checklist_ids: preChecklistIds,
+      post_checklist_ids: postChecklistIds,
       notes: t.notes || '',
       plan_id: t.plan_id || null,
       plan_name: t.plan_name,
       plan_pnl: t.plan_pnl,
+
+      // MFE / MAE Data
+      high: mfeMae.high,
+      low: mfeMae.low,
+      mfe_price: (t as any).mfe_price ?? (t as any).mfe ?? mfeMae.mfe_price,
+      mae_price: (t as any).mae_price ?? (t as any).mae ?? mfeMae.mae_price,
+      mfe_r: (t as any).mfe_r ?? mfeMae.mfe_r,
+      mae_r: (t as any).mae_r ?? mfeMae.mae_r,
 
       status: 'CLOSED',
       sub_index: t.sub_index,
@@ -549,6 +669,10 @@ export function computeTradeMetrics(
   // Session
   const session = raw.session || determineSession(raw.open_time || '', timezoneOffset);
 
+  // MFE & MAE Calculation
+  const tradeType = raw.type || 'BUY';
+  const mfeMae = calculateMfeMae(openPrice, initialSl, tradeType, raw.high, raw.low);
+
   // Result
   let result: TradeResult = 'BE';
   if (netPnl > 5) result = 'Win';
@@ -562,7 +686,7 @@ export function computeTradeMetrics(
     position_id: raw.position_id || raw.ticket || '000000',
     account_id: raw.account_id ? String(raw.account_id) : undefined,
     symbol,
-    type: raw.type || 'BUY',
+    type: tradeType,
     volume,
     open_price: openPrice,
     close_price: closePrice,
@@ -591,6 +715,14 @@ export function computeTradeMetrics(
     plan_id: raw.plan_id || null,
     plan_name: raw.plan_name,
     plan_pnl: raw.plan_pnl,
+
+    // MFE / MAE Data
+    high: raw.high ?? mfeMae.high,
+    low: raw.low ?? mfeMae.low,
+    mfe_price: raw.mfe_price ?? mfeMae.mfe_price,
+    mae_price: raw.mae_price ?? mfeMae.mae_price,
+    mfe_r: raw.mfe_r ?? mfeMae.mfe_r,
+    mae_r: raw.mae_r ?? mfeMae.mae_r,
 
     status: raw.status || 'CLOSED',
     sub_index: raw.sub_index,
@@ -759,17 +891,18 @@ export function calculatePreTradeScore(
 /**
  * Format tiền tệ USD
  */
-export function formatCurrency(val: number, withSign: boolean = true): string {
+export function formatCurrency(val: number | null | undefined, withSign: boolean = true): string {
+  const num = Number(val || 0);
   const formatted = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(Math.abs(val));
+  }).format(Math.abs(num));
 
   if (!withSign) return formatted;
-  if (val > 0) return `+${formatted}`;
-  if (val < 0) return `-${formatted}`;
+  if (num > 0) return `+${formatted}`;
+  if (num < 0) return `-${formatted}`;
   return formatted;
 }
 
