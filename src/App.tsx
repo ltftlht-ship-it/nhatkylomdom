@@ -160,6 +160,15 @@ export default function App() {
     return [];
   });
   const [accounts, setAccounts] = useState<AccountInfo[]>(() => {
+    const savedUserSession = localStorage.getItem('deal_user_session');
+    if (savedUserSession) {
+      try {
+        const u = JSON.parse(savedUserSession);
+        if (u && !checkIsAdmin(u)) {
+          return [];
+        }
+      } catch {}
+    }
     const saved = localStorage.getItem('deal_accounts_list');
     if (saved) {
       try {
@@ -221,6 +230,15 @@ export default function App() {
   accountsRef.current = accounts;
 
   const [selectedAccountId, setSelectedAccountId] = useState<string>(() => {
+    const savedUserSession = localStorage.getItem('deal_user_session');
+    if (savedUserSession) {
+      try {
+        const u = JSON.parse(savedUserSession);
+        if (u && !checkIsAdmin(u)) {
+          return '';
+        }
+      } catch {}
+    }
     const saved = localStorage.getItem('deal_selected_account_id');
     if (saved && saved !== 'ALL') return saved;
     return '26610983';
@@ -549,8 +567,41 @@ export default function App() {
         });
       }
 
-      // Cập nhật số dư và lãi lỗ cho TẤT CẢ tài khoản (không để tài khoản không active bị rơi về 10k)
-      setAccounts(prevAccounts => {
+      // Phân tách tài khoản đa người dùng thương mại (Multi-tenant Account Isolation)
+      if (!isAdmin) {
+        const userAccList: AccountInfo[] = (detectedAccounts || []).map(d => {
+          const cleanId = String(d.id).replace(/^acc-/, '').trim();
+          const accStats = tradesByAccount.get(cleanId);
+          const initBal = d.initial_balance || accStats?.initialBal || 10000;
+          const pnl = accStats?.totalNetPnl || 0;
+          return {
+            id: cleanId,
+            name: `MT5 #${cleanId}`,
+            ticket_server: `${cleanId} (MT5 Live)`,
+            balance: Number((initBal + pnl).toFixed(2)),
+            initial_balance: initBal,
+            pnl: pnl,
+            win_rate: 0,
+            wins: 0,
+            losses: 0,
+            breakeven: 0,
+            connected: true,
+            currency: 'USD',
+          };
+        });
+        setAccounts(userAccList);
+        if (userAccList.length > 0) {
+          if (!selectedAccountIdRef.current || !userAccList.some(a => a.id === selectedAccountIdRef.current)) {
+            selectedAccountIdRef.current = userAccList[0].id;
+            setSelectedAccountId(userAccList[0].id);
+          }
+        } else {
+          selectedAccountIdRef.current = '';
+          setSelectedAccountId('');
+        }
+      } else {
+        // Quản trị viên (Thầy Tài): Cập nhật số dư và lãi lỗ cho toàn bộ tài khoản MT5 gốc
+        setAccounts(prevAccounts => {
         let hasChange = false;
         const cleanedPrev = prevAccounts.filter(a => 
           a && a.id && 
@@ -647,6 +698,7 @@ export default function App() {
         }
         return prevAccounts;
       });
+      }
 
       if (data && data.length > 0) {
         // Tách biệt các lệnh CLOSED và PENDING
