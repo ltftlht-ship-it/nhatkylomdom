@@ -396,12 +396,21 @@ export default function App() {
   useEffect(() => {
     let isMounted = true;
 
-    // Kiểm tra phiên đăng nhập Quản trị viên (Admin session) lưu trong máy
+    // Kiểm tra phiên đăng nhập đã lưu trong máy (Admin hoặc Trader)
     try {
       const savedAdmin = localStorage.getItem('deal_admin_session');
       if (savedAdmin) {
         const parsed = JSON.parse(savedAdmin);
         if (parsed && parsed.email) {
+          setAuthUser(parsed);
+          setAuthLoading(false);
+          return;
+        }
+      }
+      const savedUser = localStorage.getItem('deal_user_session');
+      if (savedUser) {
+        const parsed = JSON.parse(savedUser);
+        if (parsed && (parsed.email || parsed.id)) {
           setAuthUser(parsed);
           setAuthLoading(false);
           return;
@@ -1350,6 +1359,7 @@ export default function App() {
           onSignOut={async () => {
             try {
               localStorage.removeItem('deal_admin_session');
+              localStorage.removeItem('deal_user_session');
             } catch {}
             await signOutAuthUser();
             setAuthUser(null);
