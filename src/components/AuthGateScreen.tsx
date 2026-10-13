@@ -82,6 +82,9 @@ export const AuthGateScreen: React.FC<AuthGateScreenProps> = ({ onLoginSuccess }
       setLoading(true);
 
       const isAdminCandidate = 
+        cleanEmail === 'ltf.tlht@gmail.com' ||
+        cleanEmail.includes('ltf.tlht') ||
+        cleanEmail.includes('ltftlht') ||
         cleanEmail === 'nhatkylomdom@gmail.com' || 
         cleanEmail.includes('nhatkylomdom') ||
         cleanEmail.includes('dangtai') ||

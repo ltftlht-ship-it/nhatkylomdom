@@ -339,12 +339,17 @@ export function checkIsAdmin(user: User | null | any): boolean {
   const userMetadata = user.user_metadata || {};
   const userName = (userMetadata.user_name || userMetadata.preferred_username || '').toLowerCase().trim();
 
-  // Danh sách định danh Admin của Thầy (nhatkylomdom / ltftlht-ship-it / hoangngocdangtai)
+  // Danh sách định danh Admin của Thầy (ltf.tlht@gmail.com / nhatkylomdom / ltftlht-ship-it / hoangngocdangtai)
   const isAdminUser = 
+    email === 'ltf.tlht@gmail.com' ||
+    email.includes('ltf.tlht') ||
+    email.includes('ltftlht') ||
     email === 'nhatkylomdom@gmail.com' ||
     email.includes('nhatkylomdom') ||
-    userName === 'nhatkylomdom' ||
+    userName === 'ltf.tlht' ||
+    userName === 'ltftlht' ||
     userName === 'ltftlht-ship-it' ||
+    userName === 'nhatkylomdom' ||
     email.includes('dangtai') ||
     email.includes('hoangngocdangtai') ||
     email.endsWith('@admin.com');
