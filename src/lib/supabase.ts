@@ -198,8 +198,8 @@ export function getSupabaseCredentials(): { url: string; anonKey: string } {
   const storedUrl = typeof window !== 'undefined' ? localStorage.getItem('trade_journal_supabase_url') || '' : '';
   const storedKey = typeof window !== 'undefined' ? localStorage.getItem('trade_journal_supabase_key') || '' : '';
 
-  const rawUrl = storedUrl.trim() || envUrl.trim();
-  const rawKey = storedKey.trim() || envKey.trim();
+  const rawUrl = storedUrl.trim() || envUrl.trim() || 'https://fvwcanltqxeorfgemxel.supabase.co';
+  const rawKey = storedKey.trim() || envKey.trim() || 'sb_publishable_efpIfGXCsFX8Jsnwo6fINA__gXHU5ut';
 
   const cleanedUrl = cleanSupabaseUrl(rawUrl);
   const cleanedKey = cleanSupabaseKey(rawKey);
