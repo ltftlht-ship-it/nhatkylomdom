@@ -330,6 +330,39 @@ export function subscribeToAuthChanges(callback: (user: User | null) => void) {
 }
 
 /**
+ * Kiểm tra xem người dùng hiện tại có phải là Admin (Thầy Tài) không.
+ * Chỉ Admin mới được quyền truy cập toàn bộ dữ liệu MT5 và nhật ký lệnh gốc.
+ */
+export function checkIsAdmin(user: User | null | any): boolean {
+  if (!user) return false;
+  const email = (user.email || '').toLowerCase().trim();
+  const userMetadata = user.user_metadata || {};
+  const userName = (userMetadata.user_name || userMetadata.preferred_username || '').toLowerCase().trim();
+
+  // Danh sách định danh Admin của Thầy (nhatkylomdom / ltftlht-ship-it / hoangngocdangtai)
+  const isAdminUser = 
+    email === 'nhatkylomdom@gmail.com' ||
+    email.includes('nhatkylomdom') ||
+    userName === 'nhatkylomdom' ||
+    userName === 'ltftlht-ship-it' ||
+    email.includes('dangtai') ||
+    email.includes('hoangngocdangtai') ||
+    email.endsWith('@admin.com');
+
+  if (isAdminUser) return true;
+
+  // Hỗ trợ cấu hình thêm admin từ LocalStorage nếu Thầy dùng thêm email phụ
+  try {
+    const customAdmin = localStorage.getItem('deal_admin_email');
+    if (customAdmin && email === customAdmin.toLowerCase().trim()) {
+      return true;
+    }
+  } catch {}
+
+  return false;
+}
+
+/**
  * Supabase client instance proxy cho phép gọi trực tiếp:
  * supabase.from('plans').insert([...]).select()
  * Tự động kết nối với Supabase credentials từ env hoặc Cài Đặt.
