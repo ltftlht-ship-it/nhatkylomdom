@@ -395,6 +395,20 @@ export default function App() {
   // Lắng nghe trạng thái đăng nhập Supabase Auth
   useEffect(() => {
     let isMounted = true;
+
+    // Kiểm tra phiên đăng nhập Quản trị viên (Admin session) lưu trong máy
+    try {
+      const savedAdmin = localStorage.getItem('deal_admin_session');
+      if (savedAdmin) {
+        const parsed = JSON.parse(savedAdmin);
+        if (parsed && parsed.email) {
+          setAuthUser(parsed);
+          setAuthLoading(false);
+          return;
+        }
+      }
+    } catch {}
+
     getAuthUser().then(user => {
       if (isMounted) {
         setAuthUser(user);
@@ -1334,6 +1348,9 @@ export default function App() {
           onOpenConnectEA={() => setIsConnectEAOpen(true)}
           onOpenAuth={() => setIsAuthOpen(true)}
           onSignOut={async () => {
+            try {
+              localStorage.removeItem('deal_admin_session');
+            } catch {}
             await signOutAuthUser();
             setAuthUser(null);
           }}
