@@ -2,44 +2,77 @@
 
 @layer base {
   :root {
-    --bg-main: #f8fafc;
-    --bg-card: #ffffff;
-    --bg-card-hover: #f1f5f9;
-    --bg-panel: #ffffff;
-    --bg-subtle: #f1f5f9;
+    /* Exact Stitch Design Palette (Tactile Clay Narrative) */
+    --bg-main: #fff8f0; /* Natural Linen / Warm Sand Nature canvas */
+    --bg-card: #ffffff; /* Pure Porcelain Pods / Cards */
+    --bg-card-hover: #f9f3eb;
+    --bg-panel: #ede7df; /* Neutral Oat Submenu */
+    --bg-subtle: #e8e2da; /* Inset Wells */
     --bg-input: #ffffff;
-    --border-main: #e2e8f0;
-    --border-subtle: #f1f5f9;
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --text-muted: #94a3b8;
-    --accent-teal: #0d9488;
-    --accent-teal-hover: #0f766e;
-    --accent-teal-subtle: rgba(13, 148, 136, 0.12);
-    --table-header: #f8fafc;
-    --table-row-hover: #f1f5f9;
-    --table-row-selected: #e0f2fe;
+    --border-main: #d8d0c5;
+    --border-subtle: #e2dbd0;
+    --text-primary: #1d1b17; /* Deep Warm Charcoal Ink */
+    --text-secondary: #424843;
+    --text-muted: #737973;
+    --accent-teal: #4a6152; /* Primary Deep Sage */
+    --accent-teal-hover: #3d5144;
+    --accent-teal-subtle: rgba(74, 97, 82, 0.12);
+    --color-win: #4a6152; /* Primary Sage #4a6152 */
+    --color-loss: #825249; /* Secondary Warm Clay #825249 */
+    --color-neutral: #475f6b; /* Tertiary Slate Blue #475f6b */
+    --table-header: #ede7df;
+    --table-row-hover: #f3ede5;
+    --table-row-selected: #ede4da;
+    
+    /* Claymorphism Shadow & Highlight System */
+    --clay-rail-bg: #4a6152;
+    --clay-submenu-bg: #ede7df;
+    --clay-topbar-bg: rgba(255, 248, 240, 0.88);
+    --clay-card-shadow: 6px 8px 18px rgba(125, 110, 95, 0.08);
+    --clay-card-highlight: inset 1px 1px 2px rgba(255, 255, 255, 0.95);
+    --clay-well-shadow-1: inset 2px 3px 6px rgba(90, 78, 68, 0.12);
+    --clay-well-shadow-2: inset -2px -2px 5px rgba(255, 255, 255, 0.85);
+    --clay-pill-shadow: 4px 6px 12px rgba(125, 110, 95, 0.1);
+    --clay-pill-highlight: inset 1px 1px 2px rgba(255, 255, 255, 0.9);
+    --clay-primary: #4a6152;
+    --clay-primary-shadow: 6px 8px 18px rgba(74, 97, 82, 0.35);
     color-scheme: light;
   }
 
   html.dark {
-    --bg-main: #0d1117;
-    --bg-card: #161b22;
-    --bg-card-hover: #1c2129;
-    --bg-panel: #161b22;
-    --bg-subtle: #12181f;
-    --bg-input: #0b0e14;
-    --border-main: #21262d;
-    --border-subtle: #1e293b;
-    --text-primary: #f3f4f6;
-    --text-secondary: #9ca3af;
-    --text-muted: #6b7280;
-    --accent-teal: #2dd4bf;
-    --accent-teal-hover: #14b8a6;
-    --accent-teal-subtle: rgba(45, 212, 191, 0.15);
-    --table-header: #12181f;
-    --table-row-hover: rgba(30, 41, 59, 0.45);
-    --table-row-selected: rgba(45, 212, 191, 0.12);
+    --bg-main: #18201c;
+    --bg-card: #202b25;
+    --bg-card-hover: #293830;
+    --bg-panel: #1b2420;
+    --bg-subtle: #1e2823;
+    --bg-input: #19221d;
+    --border-main: #2d3c33;
+    --border-subtle: #243029;
+    --text-primary: #f2f7f4;
+    --text-secondary: #a9beaf;
+    --text-muted: #728c7c;
+    --accent-teal: #688f76;
+    --accent-teal-hover: #7ba389;
+    --accent-teal-subtle: rgba(104, 143, 118, 0.2);
+    --color-win: #688f76;
+    --color-loss: #b07267;
+    --color-neutral: #5c7887;
+    --table-header: #1b2420;
+    --table-row-hover: #232f27;
+    --table-row-selected: rgba(104, 143, 118, 0.18);
+    
+    /* Claymorphism Dark Shadow & Highlight System */
+    --clay-rail-bg: #233329;
+    --clay-submenu-bg: #1b2420;
+    --clay-topbar-bg: rgba(24, 32, 28, 0.85);
+    --clay-card-shadow: 6px 8px 20px rgba(0, 0, 0, 0.45);
+    --clay-card-highlight: inset 1px 1px 2px rgba(255, 255, 255, 0.08);
+    --clay-well-shadow-1: inset 2px 3px 6px rgba(0, 0, 0, 0.5);
+    --clay-well-shadow-2: inset -1px -1px 3px rgba(255, 255, 255, 0.04);
+    --clay-pill-shadow: 4px 6px 12px rgba(0, 0, 0, 0.35);
+    --clay-pill-highlight: inset 1px 1px 2px rgba(255, 255, 255, 0.12);
+    --clay-primary: #688f76;
+    --clay-primary-shadow: 6px 8px 18px rgba(104, 143, 118, 0.25);
     color-scheme: dark;
   }
 
@@ -49,19 +82,42 @@
     color: var(--text-primary);
     transition: background-color 0.2s ease, color 0.2s ease;
   }
+
+  ::selection {
+    background-color: #d8d0c5;
+    color: #1d1b17;
+  }
+
+  *::selection {
+    background-color: #d8d0c5;
+    color: #1d1b17;
+  }
 }
 
-.font-mono {
-  font-family: 'JetBrains Mono', monospace;
+/* Tactile Clay Utilities */
+.clay-card {
+  box-shadow: var(--clay-card-shadow), var(--clay-card-highlight);
+  background-color: var(--bg-card);
 }
 
-/* Theme utility classes */
-.bg-app-main { background-color: var(--bg-main); }
-.bg-app-card { background-color: var(--bg-card); }
-.bg-app-subtle { background-color: var(--bg-subtle); }
-.bg-app-input { background-color: var(--bg-input); }
-.border-app-main { border-color: var(--border-main); }
-.border-app-subtle { border-color: var(--border-subtle); }
+.clay-well {
+  box-shadow: var(--clay-well-shadow-1), var(--clay-well-shadow-2);
+  background-color: var(--bg-subtle);
+}
+
+.clay-pill {
+  box-shadow: var(--clay-pill-shadow), var(--clay-pill-highlight);
+}
+
+.clay-btn-primary {
+  background-color: var(--clay-primary);
+  box-shadow: var(--clay-primary-shadow), inset 2px 2px 3px rgba(255, 255, 255, 0.4), inset -2px -2px 4px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s ease;
+}
+.clay-btn-primary:active {
+  box-shadow: inset 3px 3px 6px rgba(0, 0, 0, 0.25), inset -2px -2px 4px rgba(255, 255, 255, 0.2);
+  transform: scale(0.98);
+}
 .text-app-primary { color: var(--text-primary); }
 .text-app-secondary { color: var(--text-secondary); }
 .text-app-muted { color: var(--text-muted); }
@@ -69,16 +125,43 @@
 
 /* Custom sleek scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--bg-subtle);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
   background: var(--border-main);
-  border-radius: 4px;
+  border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
+}
+
+/* Ép chiều cao TradingView Widget toàn màn hình 100%, không bị co nhỏ hay trống đen */
+.tradingview-widget-container {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.tradingview-widget-container > div,
+.tradingview-widget-container__widget {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.tradingview-widget-container iframe {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  max-height: 100% !important;
+  border: none !important;
+  display: block !important;
 }

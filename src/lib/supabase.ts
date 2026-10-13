@@ -1,5 +1,102 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
 import { TradingPlan } from '../types';
+import { parseChecklistArray } from '../utils/tradeCalculations';
+
+// Theo dõi các cột thực tế tồn tại trong bảng trades của Supabase
+export const knownTradesColumns = new Set<string>();
+
+export function recordTradesTableColumns(rowOrKeys: Record<string, any> | string[]) {
+  if (Array.isArray(rowOrKeys)) {
+    rowOrKeys.forEach(k => { if (k) knownTradesColumns.add(String(k)); });
+  } else if (rowOrKeys && typeof rowOrKeys === 'object') {
+    Object.keys(rowOrKeys).forEach(k => { if (k) knownTradesColumns.add(String(k)); });
+  }
+}
+
+export const LOCAL_TRADE_JOURNAL_KEY = 'bigdeal_trade_journals_cache';
+
+export function saveTradeJournalToLocalCache(ticket: string | number, updates: Record<string, any>) {
+  try {
+    const cleanTicket = String(ticket || '').trim();
+    if (!cleanTicket || typeof window === 'undefined' || !window.localStorage) return;
+    
+    // Lưu các ảnh trực tiếp vào key riêng biệt để đảm bảo không bị quá tải dung lượng JSON
+    if (updates.htf_image_url !== undefined) {
+      if (updates.htf_image_url) {
+        try { localStorage.setItem(`deal_img_${cleanTicket}_htf`, updates.htf_image_url); } catch {}
+      } else {
+        try { localStorage.removeItem(`deal_img_${cleanTicket}_htf`); } catch {}
+      }
+    }
+    if (updates.ltf_image_url !== undefined || updates.image_base64 !== undefined) {
+      const val = updates.ltf_image_url ?? updates.image_base64;
+      if (val) {
+        try { localStorage.setItem(`deal_img_${cleanTicket}_ltf`, val); } catch {}
+      } else {
+        try { localStorage.removeItem(`deal_img_${cleanTicket}_ltf`); } catch {}
+      }
+    }
+
+    const raw = localStorage.getItem(LOCAL_TRADE_JOURNAL_KEY);
+    const cache: Record<string, any> = raw ? JSON.parse(raw) : {};
+    cache[cleanTicket] = {
+      ...(cache[cleanTicket] || {}),
+      ...updates,
+      _updatedAt: Date.now(),
+    };
+    try {
+      localStorage.setItem(LOCAL_TRADE_JOURNAL_KEY, JSON.stringify(cache));
+    } catch (quotaErr) {
+      console.warn('LocalStorage quota reached for journal cache, images preserved in direct keys');
+    }
+  } catch (e) {
+    console.warn('Lỗi lưu cache journal cục bộ:', e);
+  }
+}
+
+export function getTradeJournalFromLocalCache(ticket: string | number): Record<string, any> | null {
+  try {
+    const cleanTicket = String(ticket || '').trim();
+    if (!cleanTicket || typeof window === 'undefined' || !window.localStorage) return null;
+    let entry: Record<string, any> = {};
+    const raw = localStorage.getItem(LOCAL_TRADE_JOURNAL_KEY);
+    if (raw) {
+      try {
+        const cache: Record<string, any> = JSON.parse(raw);
+        if (cache[cleanTicket]) {
+          entry = { ...cache[cleanTicket] };
+        }
+      } catch {}
+    }
+    const directHtf = localStorage.getItem(`deal_img_${cleanTicket}_htf`) || localStorage.getItem(`deal_user_pre_img_${cleanTicket}`);
+    if (directHtf) {
+      entry.htf_image_url = directHtf;
+      entry.pre_image = directHtf;
+    }
+    const directLtf = localStorage.getItem(`deal_img_${cleanTicket}_ltf`) || localStorage.getItem(`deal_user_post_img_${cleanTicket}`);
+    if (directLtf) {
+      entry.ltf_image_url = directLtf;
+      entry.image_base64 = directLtf;
+    }
+
+    return Object.keys(entry).length > 0 ? entry : null;
+  } catch {
+    return null;
+  }
+}
+
+function extractMissingColumn(errorMessage: string): string | null {
+  if (!errorMessage) return null;
+  const m1 = errorMessage.match(/Could not find the '([^']+)' column/i);
+  if (m1 && m1[1]) return m1[1];
+  const m2 = errorMessage.match(/column ["']?([a-zA-Z0-9_]+)["']? of relation/i);
+  if (m2 && m2[1]) return m2[1];
+  const m3 = errorMessage.match(/column ["']?([a-zA-Z0-9_]+)["']? does not exist/i);
+  if (m3 && m3[1]) return m3[1];
+  const m4 = errorMessage.match(/Could not find column '([^']+)'/i);
+  if (m4 && m4[1]) return m4[1];
+  return null;
+}
 
 export interface SupabaseTradeRow {
   id?: string;
@@ -160,8 +257,8 @@ export function getSupabaseClient(): SupabaseClient | null {
   try {
     cachedClient = createClient(url, anonKey, {
       auth: {
-        persistSession: false,
-        autoRefreshToken: false,
+        persistSession: true,
+        autoRefreshToken: true,
       },
     });
     cachedUrl = url;
@@ -171,6 +268,65 @@ export function getSupabaseClient(): SupabaseClient | null {
     console.error('Lỗi khởi tạo Supabase Client:', err);
     return null;
   }
+}
+
+/**
+ * Các hàm hỗ trợ Supabase Authentication (Đăng nhập, Đăng ký, OAuth Google / GitHub)
+ */
+export async function getAuthUser(): Promise<User | null> {
+  try {
+    const client = getSupabaseClient();
+    if (!client) return null;
+    const { data: { user } } = await client.auth.getUser();
+    return user;
+  } catch (err) {
+    console.warn('Lỗi lấy thông tin tài khoản:', err);
+    return null;
+  }
+}
+
+export async function signInWithEmailPassword(email: string, password: string) {
+  const client = getSupabaseClient();
+  if (!client) throw new Error('Chưa kết nối Supabase');
+  return await client.auth.signInWithPassword({ email, password });
+}
+
+export async function signUpWithEmailPassword(email: string, password: string) {
+  const client = getSupabaseClient();
+  if (!client) throw new Error('Chưa kết nối Supabase');
+  return await client.auth.signUp({ 
+    email, 
+    password,
+    options: {
+      emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined
+    }
+  });
+}
+
+export async function signInWithOAuthProvider(provider: 'google' | 'github') {
+  const client = getSupabaseClient();
+  if (!client) throw new Error('Chưa kết nối Supabase');
+  return await client.auth.signInWithOAuth({
+    provider,
+    options: {
+      redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined
+    }
+  });
+}
+
+export async function signOutAuthUser() {
+  const client = getSupabaseClient();
+  if (!client) return;
+  return await client.auth.signOut();
+}
+
+export function subscribeToAuthChanges(callback: (user: User | null) => void) {
+  const client = getSupabaseClient();
+  if (!client) return { unsubscribe: () => {} };
+  const { data: { subscription } } = client.auth.onAuthStateChange((_event, session) => {
+    callback(session?.user || null);
+  });
+  return subscription;
 }
 
 /**
@@ -218,11 +374,50 @@ export const supabase = new Proxy({} as SupabaseClient, {
   }
 });
 
+export interface DetectedAccountInfo {
+  id: string;
+  initial_balance?: number;
+  trade_count?: number;
+}
+
+export function extractAccountsFromTrades(trades: any[]): DetectedAccountInfo[] {
+  if (!Array.isArray(trades)) return [];
+  const map = new Map<string, DetectedAccountInfo>();
+
+  trades.forEach(t => {
+    const rawAcc = String(
+      t.account_id ?? t.account ?? t.login ?? t.mt5_account ?? t.user_id ?? ''
+    ).replace(/^acc-/, '').trim();
+
+    if (rawAcc && rawAcc !== 'undefined' && rawAcc !== 'null' && rawAcc !== 'ALL') {
+      const existing = map.get(rawAcc);
+      const initBal = t.initial_balance && !isNaN(Number(t.initial_balance)) && Number(t.initial_balance) > 0
+        ? Number(t.initial_balance)
+        : undefined;
+
+      if (!existing) {
+        map.set(rawAcc, {
+          id: rawAcc,
+          initial_balance: initBal,
+          trade_count: 1
+        });
+      } else {
+        existing.trade_count = (existing.trade_count || 0) + 1;
+        if (!existing.initial_balance && initBal) {
+          existing.initial_balance = initBal;
+        }
+      }
+    }
+  });
+
+  return Array.from(map.values());
+}
+
 /**
  * Fetch toàn bộ danh sách lệnh từ Supabase, tối giản hóa query và lọc bằng Javascript
  * để tránh lỗi lệch kiểu dữ liệu hoặc lỗi điều kiện lọc.
  */
-export async function fetchTradesFromSupabase(accountId: string = "26325348"): Promise<SupabaseTradeRow[]> {
+export async function fetchTradesFromSupabase(accountId: string = "26610983"): Promise<SupabaseTradeRow[]> {
   console.log("--> Đang gọi Supabase với accountId:", accountId);
 
   const client = getSupabaseClient();
@@ -234,15 +429,15 @@ export async function fetchTradesFromSupabase(accountId: string = "26325348"): P
   const { url } = getSupabaseCredentials();
   console.log("--> Supabase Project URL đang kết nối:", url);
 
-  // Bỏ bớt các điều kiện lọc phức tạp để test kết nối trước
+  // Lấy dữ liệu sắp xếp theo close_time mới nhất
   let { data, error } = await client
     .from('trades')
-    .select('*');
+    .select('*')
+    .order('close_time', { ascending: false });
 
   // Nếu gặp lỗi PGRST125 hoặc PGRST205, thử kiểm tra bảng 'Trades' (viết hoa chữ T)
   if (error && (error.code === 'PGRST125' || error.code === 'PGRST205' || error.code === 'PGRST200')) {
-    console.warn("Thử kiểm tra bảng Trades (viết hoa)...");
-    const retry = await client.from('Trades').select('*');
+    const retry = await client.from('Trades').select('*').order('close_time', { ascending: false });
     if (!retry.error && retry.data) {
       data = retry.data;
       error = null;
@@ -260,16 +455,27 @@ export async function fetchTradesFromSupabase(accountId: string = "26325348"): P
     return [];
   }
 
-  console.log("✅ Dữ liệu thô Supabase trả về:", data);
-
   if (!data || data.length === 0) return [];
+
+  // Ghi nhận cấu trúc các cột thực tế của bảng trades để tối ưu khi update
+  data.forEach(row => recordTradesTableColumns(row));
+
+  // Tự động phát hiện tất cả các tài khoản MT5 xuất hiện trong database
+  const detectedAccounts = extractAccountsFromTrades(data);
 
   // Lọc dữ liệu bằng Javascript để đảm bảo an toàn tuyệt đối về kiểu dữ liệu (String/Number)
   const cleanTarget = String(accountId || '').replace(/^acc-/, '').trim();
   const filteredData = (data as SupabaseTradeRow[]).filter(item => {
-    const itemAcc = String(item.account_id ?? '').replace(/^acc-/, '').trim();
-    const matchAccount = !accountId || accountId === 'ALL' || itemAcc === cleanTarget || String(item.account_id) === String(accountId);
-    return matchAccount;
+    const itemAcc = String(
+      item.account_id ?? item.account ?? item.login ?? item.mt5_account ?? item.user_id ?? ''
+    ).replace(/^acc-/, '').trim();
+    if (itemAcc) {
+      item.account_id = itemAcc;
+    }
+    if (!cleanTarget || cleanTarget === 'ALL') {
+      return true;
+    }
+    return itemAcc === cleanTarget;
   });
 
   // Sắp xếp tăng dần theo close_time hoặc open_time bằng Javascript an toàn
@@ -279,12 +485,97 @@ export async function fetchTradesFromSupabase(accountId: string = "26325348"): P
     return timeA - timeB;
   });
 
-  console.log("📊 Dữ liệu sau khi filter Javascript:", filteredData);
-  return filteredData;
+  // Tích hợp dữ liệu từ local cache nếu Supabase chưa có (phòng khi vừa tick nhưng mạng chập chờn)
+  const enrichedData = filteredData.map(item => {
+    const cached = getTradeJournalFromLocalCache(item.ticket);
+    if (!cached) return item;
+    const hasPre = item.pre_checklist_ids && (Array.isArray(item.pre_checklist_ids) ? item.pre_checklist_ids.length > 0 : String(item.pre_checklist_ids).length > 2);
+    const hasPost = item.post_checklist_ids && (Array.isArray(item.post_checklist_ids) ? item.post_checklist_ids.length > 0 : String(item.post_checklist_ids).length > 2);
+    const cachedHtf = cached.htf_image_url || cached.pre_image || '';
+    const cachedLtf = cached.ltf_image_url || cached.image_base64 || '';
+    return {
+      ...item,
+      pre_checklist_ids: hasPre ? item.pre_checklist_ids : (cached.pre_checklist_ids ?? cached.checklist ?? item.pre_checklist_ids),
+      post_checklist_ids: hasPost ? item.post_checklist_ids : (cached.post_checklist_ids ?? cached.mistake_tags ?? item.post_checklist_ids),
+      notes: item.notes || cached.notes || '',
+      setup: item.setup || cached.setup,
+      timeframe: item.timeframe || cached.timeframe,
+      plan_id: item.plan_id || cached.plan_id,
+      plan_name: item.plan_name || cached.plan_name,
+      // Box 1: CHỈ nhận htf_image_url do user lưu, TUYỆT ĐỐI không lấy image_url_1 từ MT5!
+      htf_image_url: cachedHtf || (item.htf_image_url && item.htf_image_url !== item.image_url_1 ? item.htf_image_url : ''),
+      pre_image: cachedHtf || '',
+      // Box 2: Nhận ảnh đóng lệnh từ cache hoặc MT5
+      ltf_image_url: cachedLtf || item.ltf_image_url || item.image_base64 || item.image_url_1 || '',
+      image_base64: cachedLtf || item.image_base64 || item.ltf_image_url || item.image_url_1 || '',
+    };
+  });
+
+  // Đính kèm danh sách tài khoản đã phát hiện và mảng thô vào kết quả trả về
+  (enrichedData as any).detectedAccounts = detectedAccounts;
+  (enrichedData as any).allRawTrades = data;
+  return enrichedData;
 }
 
 // Alias for compatibility
 export const fetchClosedTradesFromSupabase = fetchTradesFromSupabase;
+
+/**
+ * Lắng nghe thay đổi bảng trades theo thời gian thực (Supabase Realtime WebSocket)
+ * Tự động bắt các sự kiện INSERT, UPDATE, DELETE khi MT5 đẩy lệnh lên Supabase.
+ */
+export function subscribeToTradesRealtime(onTradeChange: (payload: any) => void): (() => void) {
+  const client = getSupabaseClient();
+  if (!client) return () => {};
+
+  try {
+    const channelId = `realtime-trades-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const channel = client
+      .channel(channelId)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'trades',
+        },
+        (payload) => {
+          console.log('⚡ [Realtime WebSocket] Nhận biến động lệnh từ Supabase (trades):', payload);
+          onTradeChange(payload);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'Trades',
+        },
+        (payload) => {
+          console.log('⚡ [Realtime WebSocket] Nhận biến động lệnh từ Supabase (Trades):', payload);
+          onTradeChange(payload);
+        }
+      )
+      .subscribe((status, err) => {
+        if (err) {
+          console.warn('⚡ [Realtime WebSocket] Lỗi kết nối kênh:', err);
+        } else {
+          console.log('⚡ [Realtime WebSocket] Trạng thái kênh trades:', status);
+        }
+      });
+
+    return () => {
+      try {
+        client.removeChannel(channel);
+      } catch (e) {
+        console.warn('Lỗi khi đóng kênh Realtime:', e);
+      }
+    };
+  } catch (err) {
+    console.warn('Lỗi khởi tạo Supabase Realtime channel:', err);
+    return () => {};
+  }
+}
 
 /**
  * Test kết nối đến Supabase
@@ -351,22 +642,28 @@ const LOCAL_PLANS_KEY = 'trade_journal_plans';
 export async function fetchPlansFromSupabase(accountId?: string): Promise<TradingPlan[]> {
   const cleanAccountId = accountId ? String(accountId).replace(/^acc-/, '').trim() : '';
 
-  // Helper hàm lấy danh sách plans fallback từ LocalStorage theo account_id
-  const getLocalStoragePlans = (): TradingPlan[] => {
+  // Helper hàm lấy TOÀN BỘ plans từ LocalStorage
+  const getAllLocalStoragePlans = (): TradingPlan[] => {
     try {
       const saved = localStorage.getItem(LOCAL_PLANS_KEY);
       if (saved) {
-        const list: TradingPlan[] = JSON.parse(saved);
-        if (!cleanAccountId || cleanAccountId === 'ALL') {
-          return list;
-        }
-        return list.filter(p => {
-          const pAcc = String(p.account_id || '').replace(/^acc-/, '').trim();
-          return !pAcc || pAcc === cleanAccountId;
-        });
+        return JSON.parse(saved);
       }
     } catch {}
     return [];
+  };
+
+  // Helper hàm lấy danh sách plans fallback từ LocalStorage theo đúng account_id
+  const getLocalStoragePlans = (): TradingPlan[] => {
+    const list = getAllLocalStoragePlans();
+    if (!cleanAccountId || cleanAccountId === 'ALL') {
+      return list;
+    }
+    return list.filter(p => {
+      const pAcc = String(p.account_id || '').replace(/^acc-/, '').trim();
+      // Phân tách tài khoản tuyệt đối: chỉ lấy plan thuộc đúng cleanAccountId
+      return pAcc === cleanAccountId;
+    });
   };
 
   try {
@@ -375,23 +672,17 @@ export async function fetchPlansFromSupabase(accountId?: string): Promise<Tradin
       return getLocalStoragePlans();
     }
 
+    // Tải toàn bộ Plans của Thầy trên Supabase để không bao giờ bị mất hoặc ẩn nhầm Plan
     let query = client
       .from('plans')
       .select('*')
       .order('created_at', { ascending: false });
-
-    if (cleanAccountId && cleanAccountId !== 'ALL') {
-      query = query.eq('account_id', cleanAccountId);
-    }
 
     let { data, error } = await query;
 
     // Trường hợp bảng được đặt tên hoa 'Plans'
     if (error && (error.code === 'PGRST125' || error.code === 'PGRST205' || error.code === 'PGRST200')) {
       let retry = client.from('Plans').select('*').order('created_at', { ascending: false });
-      if (cleanAccountId && cleanAccountId !== 'ALL') {
-        retry = retry.eq('account_id', cleanAccountId);
-      }
       const res = await retry;
       if (!res.error && res.data) {
         data = res.data;
@@ -399,14 +690,9 @@ export async function fetchPlansFromSupabase(accountId?: string): Promise<Tradin
       }
     }
 
-    if (error) {
-      console.warn("Không thể tải danh sách Plans từ Supabase (sử dụng cache nội bộ):", error.message || error);
-      return getLocalStoragePlans();
-    }
-
-    if (data) {
+    if (data && data.length > 0) {
       console.log(`[fetchPlansFromSupabase] Đã nạp ${data.length} plans từ Supabase cho account: ${cleanAccountId || 'ALL'}`);
-      const plansList: TradingPlan[] = data.map((item: any) => ({
+      const remotePlans: TradingPlan[] = data.map((item: any) => ({
         id: String(item.id),
         account_id: item.account_id ? String(item.account_id) : (cleanAccountId || undefined),
         plan_name: item.plan_name || item.title || `${item.symbol || 'PLAN'} - ${item.created_at?.slice(0, 16) || ''}`,
@@ -414,7 +700,8 @@ export async function fetchPlansFromSupabase(accountId?: string): Promise<Tradin
         timeframe: item.timeframe || 'M15',
         setup: item.setup || '',
         notes: item.notes || '',
-        checklist: Array.isArray(item.checklist) ? item.checklist : (item.checklist ? (typeof item.checklist === 'string' ? JSON.parse(item.checklist) : []) : []),
+        checklist: parseChecklistArray(item.checklist || item.pre_checklist_ids),
+        post_checklist: parseChecklistArray(item.post_checklist || item.post_checklist_ids),
         image_url: item.image_url || item.imageUrl || item.htf_image_url || '',
         status: item.status || 'PENDING',
         created_at: item.created_at || new Date().toISOString(),
@@ -428,19 +715,25 @@ export async function fetchPlansFromSupabase(accountId?: string): Promise<Tradin
         bias: item.bias,
       }));
 
-      // Cache đồng bộ để sử dụng offline nếu cần
+      // Gộp các plan từ LocalStorage nếu có plan mới tạo chưa kịp phản hồi từ Supabase
+      const localList = getAllLocalStoragePlans();
+      const remoteIdSet = new Set(remotePlans.map(p => p.id));
+      const unsyncedLocals = localList.filter(lp => !remoteIdSet.has(lp.id));
+      const finalPlans = [...remotePlans, ...unsyncedLocals];
+
+      // Lưu danh sách mới nhất vào LocalStorage
       try {
-        localStorage.setItem(LOCAL_PLANS_KEY, JSON.stringify(plansList));
+        localStorage.setItem(LOCAL_PLANS_KEY, JSON.stringify(finalPlans));
       } catch {}
 
-      return plansList;
+      return finalPlans;
     }
+
+    return getLocalStoragePlans();
   } catch (err: any) {
     console.warn('Không thể tải plans từ Supabase (chuyển fallback cache):', err?.message || err);
     return getLocalStoragePlans();
   }
-
-  return getLocalStoragePlans();
 }
 
 /**
@@ -512,7 +805,7 @@ export async function fetchPlansForTrade(
           timeframe: item.timeframe || 'M15',
           setup: item.setup || '',
           notes: item.notes || '',
-          checklist: Array.isArray(item.checklist) ? item.checklist : (item.checklist ? JSON.parse(item.checklist) : []),
+          checklist: parseChecklistArray(item.checklist || item.pre_checklist_ids),
           image_url: item.image_url || item.htf_image_url || '',
           status: item.status || 'PENDING',
           created_at: item.created_at || new Date().toISOString(),
@@ -533,7 +826,7 @@ export async function fetchPlansForTrade(
       const list: TradingPlan[] = JSON.parse(saved);
       return list.filter(p => {
         const pAcc = String(p.account_id || '').replace(/^acc-/, '').trim();
-        const matchAcc = !cleanAccountId || cleanAccountId === 'ALL' || !pAcc || pAcc === cleanAccountId;
+        const matchAcc = !cleanAccountId || cleanAccountId === 'ALL' || pAcc === cleanAccountId;
         const pSym = (p.symbol || '').replace('/', '').toUpperCase();
         const matchSym = !noSlashSymbol || pSym === noSlashSymbol;
         return matchAcc && matchSym;
@@ -545,18 +838,49 @@ export async function fetchPlansForTrade(
 }
 
 /**
- * Lưu / Thêm mới Plan lên Supabase & LocalStorage (status mặc định 'PENDING')
+ * Helper kiểm tra chuỗi có đúng định dạng UUID PostgreSQL không
  */
-export async function savePlanToSupabase(plan: TradingPlan): Promise<{ success: boolean; error?: string }> {
+export function isValidUUID(id: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+}
+
+/**
+ * Sinh UUID v4 chuẩn tương thích 100% với cột UUID của PostgreSQL Supabase
+ */
+export function generateValidUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    try {
+      return crypto.randomUUID();
+    } catch {}
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+/**
+ * Lưu / Thêm mới Plan lên Supabase & LocalStorage (status mặc định 'PENDING')
+ * Luôn đảm bảo ID là UUID v4 hợp lệ để PostgreSQL không từ chối lưu.
+ */
+export async function savePlanToSupabase(plan: TradingPlan): Promise<{ success: boolean; plan: TradingPlan; error?: string }> {
+  // Đảm bảo ID luôn là UUID chuẩn v4 cho PostgreSQL
+  const safeId = (plan.id && isValidUUID(plan.id)) ? plan.id : generateValidUUID();
+  const safePlan: TradingPlan = {
+    ...plan,
+    id: safeId,
+  };
+
   // 1. Luôn lưu vào LocalStorage ngay lập tức
   try {
     const saved = localStorage.getItem(LOCAL_PLANS_KEY);
     let list: TradingPlan[] = saved ? JSON.parse(saved) : [];
-    const existingIndex = list.findIndex(p => p.id === plan.id);
+    const existingIndex = list.findIndex(p => p.id === safePlan.id || (plan.id && p.id === plan.id));
     if (existingIndex >= 0) {
-      list[existingIndex] = plan;
+      list[existingIndex] = safePlan;
     } else {
-      list.unshift(plan);
+      list.unshift(safePlan);
     }
     localStorage.setItem(LOCAL_PLANS_KEY, JSON.stringify(list));
   } catch (err) {
@@ -567,31 +891,59 @@ export async function savePlanToSupabase(plan: TradingPlan): Promise<{ success: 
   try {
     const client = getSupabaseClient();
     if (client) {
-      const safeImageUrl = plan.image_url && !plan.image_url.startsWith('data:image/') ? plan.image_url : null;
+      const safeImageUrl = safePlan.image_url || null;
       const payload = {
-        id: plan.id,
-        account_id: plan.account_id ? String(plan.account_id).replace(/^acc-/, '').trim() : null,
-        plan_name: plan.plan_name,
-        symbol: plan.symbol,
-        timeframe: plan.timeframe,
-        setup: plan.setup || null,
-        notes: plan.notes || null,
-        checklist: plan.checklist || [],
+        id: safePlan.id,
+        account_id: safePlan.account_id ? String(safePlan.account_id).replace(/^acc-/, '').trim() : null,
+        plan_name: safePlan.plan_name,
+        symbol: safePlan.symbol,
+        timeframe: safePlan.timeframe,
+        setup: safePlan.setup || null,
+        notes: safePlan.notes || null,
+        checklist: safePlan.checklist || [],
+        post_checklist: safePlan.post_checklist || [],
         image_url: safeImageUrl,
-        status: plan.status || 'PENDING',
-        created_at: plan.created_at || new Date().toISOString(),
+        status: safePlan.status || 'PENDING',
+        created_at: safePlan.created_at || new Date().toISOString(),
       };
 
       const { error } = await client.from('plans').upsert(payload);
       if (error) {
-        console.warn('Lỗi upsert bảng plans trên Supabase (có thể bảng chưa được tạo):', error.message);
-        return { success: true, error: error.message }; // Vẫn coi là thành công vì đã lưu LocalStorage an toàn
+        console.warn('Lỗi upsert bảng plans trên Supabase:', error.message);
+        return { success: false, plan: safePlan, error: error.message };
       }
     }
-    return { success: true };
+    return { success: true, plan: safePlan };
   } catch (err: any) {
     console.warn('Lỗi gửi plan lên Supabase:', err);
-    return { success: true, error: err.message };
+    return { success: false, plan: safePlan, error: err.message };
+  }
+}
+
+/**
+ * Xóa Plan khỏi Supabase & LocalStorage
+ */
+export async function deletePlanFromSupabase(planId: string): Promise<boolean> {
+  // Cập nhật LocalStorage
+  try {
+    const saved = localStorage.getItem(LOCAL_PLANS_KEY);
+    if (saved) {
+      const list: TradingPlan[] = JSON.parse(saved);
+      const updated = list.filter(p => p.id !== planId);
+      localStorage.setItem(LOCAL_PLANS_KEY, JSON.stringify(updated));
+    }
+  } catch {}
+
+  // Cập nhật Supabase
+  try {
+    const client = getSupabaseClient();
+    if (client) {
+      await client.from('plans').delete().eq('id', planId);
+    }
+    return true;
+  } catch (err) {
+    console.warn('Lỗi delete plan trên Supabase:', err);
+    return false;
   }
 }
 
@@ -662,11 +1014,6 @@ export async function updateTradeJournalOnSupabase(
   optionalAccountId?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const client = getSupabaseClient();
-    if (!client) {
-      return { success: true };
-    }
-
     // Chuẩn hóa tham số gọi hàm
     let targetTicket: string | number = '';
     let targetId: string | undefined = undefined;
@@ -685,111 +1032,171 @@ export async function updateTradeJournalOnSupabase(
       targetAccountId = optionalAccountId;
     }
 
-    // 1. Áp dụng Strict Whitelist cho các trường Journal
-    const payload: Record<string, any> = {};
+    const cleanTicket = String(targetTicket || '').trim();
 
-    if ('plan_id' in updates) payload.plan_id = updates.plan_id ?? null;
-    if ('plan_name' in updates) payload.plan_name = updates.plan_name ?? null;
-    if ('timeframe' in updates) payload.timeframe = updates.timeframe ?? null;
+    // 1. Lưu ngay vào local cache để đảm bảo không mất dữ liệu dù có sự cố mạng
+    if (cleanTicket) {
+      saveTradeJournalToLocalCache(cleanTicket, updates);
+    }
+
+    const client = getSupabaseClient();
+    if (!client) {
+      return { success: true };
+    }
+
+    // 2. Chuẩn bị payload ứng viên với whitelist nghiêm ngặt
+    const candidatePayload: Record<string, any> = {};
+
+    if ('plan_id' in updates) candidatePayload.plan_id = updates.plan_id ?? null;
+    if ('plan_name' in updates) candidatePayload.plan_name = updates.plan_name ?? null;
+    if ('timeframe' in updates) candidatePayload.timeframe = updates.timeframe ?? null;
     if ('setup' in updates) {
-      payload.setup = updates.setup ?? null;
-      payload.setups = updates.setup ? [updates.setup] : [];
+      candidatePayload.setup = updates.setup ?? null;
+      candidatePayload.setups = updates.setup ? [updates.setup] : [];
     }
     if ('setups' in updates && Array.isArray(updates.setups)) {
-      payload.setups = updates.setups;
+      candidatePayload.setups = updates.setups;
     }
-    if ('notes' in updates) payload.notes = updates.notes ?? '';
+    if ('notes' in updates) candidatePayload.notes = updates.notes ?? '';
 
-    // Đồng bộ cả 2 tên cột phổ biến cho Checklist Pre-trade
+    // Đồng bộ cả 2 tên cột cho Checklist Pre-trade: pre_checklist_ids & checklist
     if ('pre_checklist_ids' in updates || 'checklist' in updates) {
-      const list = updates.pre_checklist_ids ?? updates.checklist ?? [];
-      payload.pre_checklist_ids = list;
-      payload.checklist = list;
+      const list = parseChecklistArray(updates.pre_checklist_ids ?? updates.checklist ?? []);
+      candidatePayload.pre_checklist_ids = list;
+      candidatePayload.checklist = list;
     }
 
-    // Đồng bộ cả 2 tên cột phổ biến cho Checklist Post-trade / Mistake tags
+    // Đồng bộ cả 2 tên cột cho Checklist Post-trade / Mistake tags: post_checklist_ids & mistake_tags
     if ('post_checklist_ids' in updates || 'mistake_tags' in updates) {
-      const mistakes = updates.post_checklist_ids ?? updates.mistake_tags ?? [];
-      payload.post_checklist_ids = mistakes;
-      payload.mistake_tags = mistakes;
+      const mistakes = parseChecklistArray(updates.post_checklist_ids ?? updates.mistake_tags ?? []);
+      candidatePayload.post_checklist_ids = mistakes;
+      candidatePayload.mistake_tags = mistakes;
     }
 
     // Financial calculations từ user / plan
     if ('lost_profit' in updates) {
-      payload.lost_profit = updates.lost_profit !== null && updates.lost_profit !== undefined ? Number(updates.lost_profit) : 0;
+      candidatePayload.lost_profit = updates.lost_profit !== null && updates.lost_profit !== undefined ? Number(updates.lost_profit) : 0;
     }
     if ('plan_pnl' in updates) {
-      payload.plan_pnl = updates.plan_pnl !== null && updates.plan_pnl !== undefined ? Number(updates.plan_pnl) : null;
+      candidatePayload.plan_pnl = updates.plan_pnl !== null && updates.plan_pnl !== undefined ? Number(updates.plan_pnl) : null;
     }
 
     // MFE / MAE nếu có sẵn
-    if ('mfe' in updates && updates.mfe !== undefined) payload.mfe = updates.mfe;
-    if ('mae' in updates && updates.mae !== undefined) payload.mae = updates.mae;
-    if ('mfe_r' in updates && updates.mfe_r !== undefined) payload.mfe_r = updates.mfe_r;
-    if ('mae_r' in updates && updates.mae_r !== undefined) payload.mae_r = updates.mae_r;
+    if ('mfe' in updates && updates.mfe !== undefined) candidatePayload.mfe = updates.mfe;
+    if ('mae' in updates && updates.mae !== undefined) candidatePayload.mae = updates.mae;
+    if ('mfe_r' in updates && updates.mfe_r !== undefined) candidatePayload.mfe_r = updates.mfe_r;
+    if ('mae_r' in updates && updates.mae_r !== undefined) candidatePayload.mae_r = updates.mae_r;
 
-    // Lưu URL ảnh (chỉ lưu URL/path, tuyệt đối không lưu chuỗi base64 data:image)
+    // Lưu URL ảnh
     const rawPreImg = updates.image_url_1 || updates.htf_image_url;
     if (rawPreImg && typeof rawPreImg === 'string' && !rawPreImg.startsWith('data:')) {
-      payload.image_url_1 = rawPreImg;
-      payload.htf_image_url = rawPreImg;
+      candidatePayload.image_url_1 = rawPreImg;
+      candidatePayload.htf_image_url = rawPreImg;
     }
 
     const rawPostImg = updates.ltf_image_url || updates.image_base64;
     if (rawPostImg && typeof rawPostImg === 'string' && !rawPostImg.startsWith('data:')) {
-      payload.ltf_image_url = rawPostImg;
-      payload.image_base64 = rawPostImg;
+      candidatePayload.ltf_image_url = rawPostImg;
+      candidatePayload.image_base64 = rawPostImg;
     }
 
     // Safety Clean: Tuyệt đối không để lọt trường raw hay base64
-    delete (payload as any).pnl;
-    delete (payload as any).net_pnl;
-    delete (payload as any).open_price;
-    delete (payload as any).close_price;
-    delete (payload as any).volume;
-    delete (payload as any).open_time;
-    delete (payload as any).close_time;
-    delete (payload as any).commission;
-    delete (payload as any).swap;
-    delete (payload as any).initial_sl;
-    delete (payload as any).initial_balance;
-    delete (payload as any).symbol;
-    delete (payload as any).type;
+    delete (candidatePayload as any).pnl;
+    delete (candidatePayload as any).net_pnl;
+    delete (candidatePayload as any).open_price;
+    delete (candidatePayload as any).close_price;
+    delete (candidatePayload as any).volume;
+    delete (candidatePayload as any).open_time;
+    delete (candidatePayload as any).close_time;
+    delete (candidatePayload as any).commission;
+    delete (candidatePayload as any).swap;
+    delete (candidatePayload as any).initial_sl;
+    delete (candidatePayload as any).initial_balance;
+    delete (candidatePayload as any).symbol;
+    delete (candidatePayload as any).type;
 
-    for (const key of Object.keys(payload)) {
-      if (typeof payload[key] === 'string' && payload[key].startsWith('data:image/')) {
-        delete payload[key];
+    for (const key of Object.keys(candidatePayload)) {
+      if (typeof candidatePayload[key] === 'string' && candidatePayload[key].startsWith('data:image/')) {
+        delete candidatePayload[key];
       }
+    }
+
+    // 3. Khớp cột với knownTradesColumns nếu đã biết schema cache
+    let payload: Record<string, any> = {};
+    if (knownTradesColumns.size > 0) {
+      for (const [k, v] of Object.entries(candidatePayload)) {
+        if (knownTradesColumns.has(k)) {
+          payload[k] = v;
+        }
+      }
+      // Nếu knownTradesColumns chưa có cả pre_checklist_ids lẫn checklist, giữ lại pre_checklist_ids
+      if (('pre_checklist_ids' in candidatePayload || 'checklist' in candidatePayload) &&
+          !payload.pre_checklist_ids && !payload.checklist) {
+        payload.pre_checklist_ids = candidatePayload.pre_checklist_ids;
+      }
+      if (('post_checklist_ids' in candidatePayload || 'mistake_tags' in candidatePayload) &&
+          !payload.post_checklist_ids && !payload.mistake_tags) {
+        payload.post_checklist_ids = candidatePayload.post_checklist_ids;
+      }
+    } else {
+      payload = { ...candidatePayload };
     }
 
     if (Object.keys(payload).length === 0) {
       return { success: true };
     }
 
-    const cleanTicket = String(targetTicket || '').trim();
-    let query = client.from('trades').update(payload);
+    // 4. Vòng lặp cập nhật với cơ chế tự động thích ứng loại bỏ cột không tồn tại (PGRST204)
+    const hasValidTicket = Boolean(cleanTicket && cleanTicket !== '0' && cleanTicket !== '000000');
+    const isRealSupabaseId = Boolean(targetId && !targetId.startsWith('trade-') && !targetId.startsWith('sb-'));
 
-    if (cleanTicket && cleanTicket !== '0' && cleanTicket !== '000000') {
-      query = query.eq('ticket', cleanTicket);
-      if (targetAccountId) {
-        const cleanAcc = String(targetAccountId).replace(/^acc-/, '').trim();
-        if (cleanAcc && cleanAcc !== 'ALL') {
-          query = query.eq('account_id', cleanAcc);
-        }
+    let attempt = 0;
+    const maxAttempts = 5;
+    let lastError: any = null;
+
+    while (attempt < maxAttempts) {
+      attempt++;
+      if (Object.keys(payload).length === 0) {
+        return { success: true };
       }
-    } else if (targetId && !targetId.startsWith('trade-') && !targetId.startsWith('sb-')) {
-      query = query.eq('id', targetId);
-    } else {
-      query = query.eq('ticket', cleanTicket);
+
+      let query = client.from('trades').update(payload);
+      if (hasValidTicket) {
+        query = query.eq('ticket', cleanTicket);
+      } else if (isRealSupabaseId) {
+        query = query.eq('id', targetId);
+      } else {
+        query = query.eq('ticket', cleanTicket);
+      }
+
+      const { data, error } = await query.select('ticket');
+      if (!error) {
+        if ((!data || data.length === 0) && isRealSupabaseId && hasValidTicket) {
+          const retryById = await client.from('trades').update(payload).eq('id', targetId).select('ticket');
+          if (!retryById.error && retryById.data && retryById.data.length > 0) {
+            return { success: true };
+          }
+        }
+        return { success: true };
+      }
+
+      lastError = error;
+      console.warn(`[updateTradeJournalOnSupabase] Lần thử ${attempt} lỗi:`, error.message);
+
+      // Phát hiện cột không tồn tại trong database để loại bỏ và thử lại
+      const missingCol = extractMissingColumn(error.message);
+      if (missingCol && missingCol in payload) {
+        console.warn(`[updateTradeJournalOnSupabase] Loại bỏ cột '${missingCol}' không có trong database và retry...`);
+        delete payload[missingCol];
+        knownTradesColumns.delete(missingCol);
+        continue;
+      }
+
+      break;
     }
 
-    const { error } = await query;
-    if (error) {
-      console.warn('Lỗi Supabase khi update journal record:', error.message);
-      return { success: false, error: error.message };
-    }
-
-    return { success: true };
+    console.warn('Lỗi Supabase khi update journal record:', lastError?.message);
+    return { success: false, error: lastError?.message || 'Không thể lưu trade' };
   } catch (err: any) {
     console.warn('Ngoại lệ khi update journal record:', err);
     return { success: false, error: err?.message || String(err) };
@@ -851,64 +1258,33 @@ export async function updateTradeMappingOnSupabase(
   accountId?: string
 ): Promise<boolean> {
   try {
-    const client = getSupabaseClient();
-
     // 1. Cập nhật status Plan = 'EXECUTED' trên bảng plans nếu có plan_id
     if (mapping.plan_id) {
       await updatePlanStatusOnSupabase(mapping.plan_id, 'EXECUTED');
     }
 
-    if (!client) return true;
+    // 2. Chuẩn hóa checklist array độc lập
+    const checklistData = parseChecklistArray(mapping.checklist || mapping.pre_checklist_ids || []);
 
-    const checklistData = mapping.checklist || mapping.pre_checklist_ids || [];
-    const payload: Record<string, any> = {
-      plan_id: mapping.plan_id,
-    };
+    // 3. Ủy nhiệm trực tiếp cho updateTradeJournalOnSupabase để hưởng trọn tính năng adaptive schema & retry
+    const res = await updateTradeJournalOnSupabase(
+      { id: tradeId, ticket, account_id: accountId },
+      {
+        plan_id: mapping.plan_id,
+        plan_name: mapping.plan_name,
+        timeframe: mapping.timeframe,
+        setup: mapping.setup,
+        notes: mapping.notes,
+        pre_checklist_ids: checklistData,
+        checklist: checklistData,
+        image_url_1: mapping.image_url_1,
+        htf_image_url: mapping.image_url_1,
+      },
+      undefined,
+      accountId
+    );
 
-    if (mapping.plan_name !== undefined) payload.plan_name = mapping.plan_name;
-    if (mapping.timeframe !== undefined) payload.timeframe = mapping.timeframe;
-    if (mapping.notes !== undefined) payload.notes = mapping.notes;
-    if (mapping.setup !== undefined) {
-      payload.setup = mapping.setup;
-      payload.setups = mapping.setup ? [mapping.setup] : [];
-    }
-    if (checklistData.length > 0) {
-      payload.pre_checklist_ids = checklistData;
-      payload.checklist = checklistData;
-    }
-
-    // TUYỆT ĐỐI KHÔNG lưu base64 vào database trades
-    if (mapping.image_url_1 !== undefined && mapping.image_url_1) {
-      if (!mapping.image_url_1.startsWith('data:image/')) {
-        payload.image_url_1 = mapping.image_url_1;
-        payload.htf_image_url = mapping.image_url_1;
-      }
-    }
-
-    // Thử update theo Ticket hoặc ID
-    const cleanTicket = String(ticket || '').trim();
-    let query = client.from('trades').update(payload);
-
-    if (cleanTicket && cleanTicket !== '0' && cleanTicket !== '000000') {
-      query = query.eq('ticket', cleanTicket);
-      if (accountId) {
-        const cleanAcc = String(accountId).replace(/^acc-/, '').trim();
-        if (cleanAcc && cleanAcc !== 'ALL') {
-          query = query.eq('account_id', cleanAcc);
-        }
-      }
-    } else if (tradeId && !tradeId.startsWith('trade-') && !tradeId.startsWith('sb-')) {
-      query = query.eq('id', tradeId);
-    } else {
-      query = query.eq('ticket', cleanTicket);
-    }
-
-    const { error } = await query;
-    if (error) {
-      console.warn('Lỗi Supabase khi map Plan cho Trade:', error.message);
-      return false;
-    }
-    return true;
+    return res.success;
   } catch (err) {
     console.warn('Lỗi gọi Supabase khi map trade:', err);
     return false;

@@ -12,7 +12,6 @@ import {
   SetupTagItem
 } from './types';
 import { 
-  INITIAL_PENDING_ORDERS, 
   DEFAULT_PLANS, 
   DEFAULT_ACCOUNTS, 
   DEFAULT_PRE_CHECKLIST, 
@@ -31,16 +30,25 @@ import {
   getSavedNoiseFilter,
   saveNoiseFilter,
   getSavedHideNoiseRows,
-  saveHideNoiseRows
+  saveHideNoiseRows,
+  parseChecklistArray
 } from './utils/tradeCalculations';
 import { 
   fetchTradesFromSupabase,
+  subscribeToTradesRealtime,
   fetchPlansFromSupabase,
   savePlanToSupabase,
   updatePlanStatusOnSupabase,
+  deletePlanFromSupabase,
   updateTradeMappingOnSupabase,
   updateTradeJournalOnSupabase,
-  cancelPendingOrderOnSupabase
+  cancelPendingOrderOnSupabase,
+  DetectedAccountInfo,
+  extractAccountsFromTrades,
+  getTradeJournalFromLocalCache,
+  getAuthUser,
+  signOutAuthUser,
+  subscribeToAuthChanges
 } from './lib/supabase';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -48,23 +56,42 @@ import { HistoryTable } from './components/HistoryTable';
 import { PendingOrdersTable } from './components/PendingOrdersTable';
 import { TradeDetailCard } from './components/TradeDetailCard';
 import { SettingsModal } from './components/SettingsModal';
+import { ChecklistEditorModal } from './components/ChecklistEditorModal';
 import { ImportModal } from './components/ImportModal';
 import { ImageViewerModal } from './components/ImageViewerModal';
+import { AuthModal } from './components/AuthModal';
 import { OverviewTab } from './components/OverviewTab';
 import { PlansTab } from './components/PlansTab';
+import { ChartTab } from './components/ChartTab';
 import { ReportsTab } from './components/ReportsTab';
 import { SettingsTab } from './components/SettingsTab';
 import { Clock, Layers, Zap, CheckCircle2 } from 'lucide-react';
 
 export default function App() {
   // Global State
-  const [currentTab, setCurrentTab] = useState<string>('lich-su');
+  const [currentTab, setCurrentTab] = useState<string>(() => {
+    const saved = localStorage.getItem('deal_current_tab');
+    if (saved === 'bieu-do') return 'ke-hoach';
+    return saved || 'lich-su';
+  });
+
+  const handleTabChange = (tab: string) => {
+    setCurrentTab(tab);
+    localStorage.setItem('deal_current_tab', tab);
+  };
   
   // Dark / Light Mode Global Theme
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return true;
+    if (typeof window === 'undefined') return false;
+    const migrated = localStorage.getItem('tactile_clay_v1_active');
+    if (!migrated) {
+      localStorage.setItem('tactile_clay_v1_active', 'true');
+      localStorage.setItem('trade_journal_theme', 'light');
+      document.documentElement.classList.remove('dark');
+      return false;
+    }
     const saved = localStorage.getItem('trade_journal_theme');
-    return saved ? saved === 'dark' : true;
+    return saved === 'dark';
   });
 
   const handleToggleTheme = () => {
@@ -93,7 +120,7 @@ export default function App() {
   const [selectedResult, setSelectedResult] = useState<string>('ALL');
   const [selectedSetup, setSelectedSetup] = useState<string>('ALL');
   const [noiseFilterActive, setNoiseFilterActive] = useState<boolean>(() => getSavedNoiseFilter());
-  const [hideNoiseRows, setHideNoiseRows] = useState<boolean>(() => getSavedHideNoiseRows());
+  const [hideNoiseRows, setHideNoiseRows] = useState<boolean>(false);
 
   const handleToggleNoiseFilter = () => {
     const next = !noiseFilterActive;
@@ -118,10 +145,118 @@ export default function App() {
   
   // Data States - Khởi tạo mảng rỗng không dán cứng dữ liệu giả
   const [trades, setTrades] = useState<TradeRow[]>([]);
-  const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>(INITIAL_PENDING_ORDERS);
-  const [plans, setPlans] = useState<TradingPlan[]>([]);
-  const [accounts, setAccounts] = useState<AccountInfo[]>(DEFAULT_ACCOUNTS);
-  const [selectedAccountId, setSelectedAccountId] = useState<string>('26325348');
+  const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([]);
+  const [plans, setPlans] = useState<TradingPlan[]>(() => {
+    try {
+      const saved = localStorage.getItem('trade_journal_plans');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return [];
+  });
+  const [accounts, setAccounts] = useState<AccountInfo[]>(() => {
+    const saved = localStorage.getItem('deal_accounts_list');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const cleaned = parsed
+            .filter((a: any) => 
+              a && a.id && 
+              a.id !== 'ALL' && 
+              !String(a.id).startsWith('mock-') && 
+              !String(a.name || '').toLowerCase().includes('tất cả tài khoản')
+            )
+            .map((a: any) => {
+              const cleanId = String(a.id).replace(/^acc-/, '').trim();
+              let initBal = Number(a.initial_balance);
+              if (isNaN(initBal) || initBal === 10000) {
+                if (cleanId === '26325348') initBal = 60000;
+                else if (cleanId === '26610983') initBal = 100000;
+                else initBal = 10000;
+              }
+              const pnl = Number(a.pnl ?? 0);
+              let bal = Number(a.balance);
+              if (isNaN(bal) || bal === 10000 || bal === 0) {
+                bal = Number((initBal + pnl).toFixed(2));
+              }
+              // Bảo vệ chống nhiễm chéo: nếu tài khoản 26325348 bị dính số dư 100k do lỗi cũ, đưa về 60k
+              if (cleanId === '26325348' && (bal > 90000 || initBal > 90000)) {
+                bal = Number((60000 + pnl).toFixed(2));
+                initBal = 60000;
+              }
+              // Bảo vệ chống nhiễm chéo: nếu tài khoản 26610983 bị dính số dư 60k do lỗi cũ, đưa về 100k
+              if (cleanId === '26610983' && (bal < 80000 || initBal < 80000)) {
+                bal = Number((100000 + pnl).toFixed(2));
+                initBal = 100000;
+              }
+              return {
+                ...a,
+                id: cleanId,
+                initial_balance: initBal,
+                balance: bal,
+              };
+            });
+
+          if (cleaned.length > 0) {
+            localStorage.setItem('deal_accounts_list', JSON.stringify(cleaned));
+            return cleaned;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to parse deal_accounts_list from localStorage', e);
+      }
+    }
+    const def = DEFAULT_ACCOUNTS.filter(a => a && a.id !== 'ALL' && !String(a.id).startsWith('mock-'));
+    localStorage.setItem('deal_accounts_list', JSON.stringify(def));
+    return def;
+  });
+
+  const accountsRef = useRef<AccountInfo[]>(accounts);
+  accountsRef.current = accounts;
+
+  const [selectedAccountId, setSelectedAccountId] = useState<string>(() => {
+    const saved = localStorage.getItem('deal_selected_account_id');
+    if (saved && saved !== 'ALL') return saved;
+    return '26610983';
+  });
+
+  const selectedAccountIdRef = useRef<string>(selectedAccountId);
+  selectedAccountIdRef.current = selectedAccountId;
+
+  // Bộ nhớ đệm trades giữa các tài khoản để chuyển tab tài khoản tức thì (0ms latency, không giật về 10k)
+  const tradesCacheRef = useRef<Record<string, { trades: TradeRow[]; pending: PendingOrder[]; rawClosed: any[] }>>({});
+
+  const handleAccountIdChange = (accId: string) => {
+    if (!accId || accId === 'ALL') return;
+    const cleanId = String(accId).replace(/^acc-/, '').trim();
+    selectedAccountIdRef.current = cleanId;
+    setSelectedAccountId(cleanId);
+    localStorage.setItem('deal_selected_account_id', cleanId);
+
+    // Tải danh sách plans của tài khoản
+    loadPlans(cleanId);
+
+    // Nạp tức thì từ cache nếu tài khoản này đã được nạp trước đó (0ms delay!)
+    const cached = tradesCacheRef.current[cleanId];
+    if (cached && cached.trades && cached.trades.length > 0) {
+      setTrades(cached.trades);
+      setPendingOrders(cached.pending);
+      rawClosedTradesRef.current = cached.rawClosed;
+      setSelectedTradeId(cached.trades[0]?.id || '');
+    } else {
+      // Nếu chưa có trong cache, reset rỗng để không bị dính lệnh của tài khoản trước!
+      setTrades([]);
+      setPendingOrders([]);
+      rawClosedTradesRef.current = [];
+      setSelectedTradeId('');
+    }
+
+    // Gọi nạp dữ liệu tức thì từ Supabase cho tài khoản mới chọn
+    loadTrades(cleanId, false);
+  };
 
   // Supabase connection & sync state
   const [supabaseStatus, setSupabaseStatus] = useState<'connected' | 'demo' | 'loading' | 'error'>('loading');
@@ -129,14 +264,79 @@ export default function App() {
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
 
   // Active Selected Trade for Detail Card
-  const [selectedTradeId, setSelectedTradeId] = useState<string>('');
+  const [selectedTradeId, setSelectedTradeId] = useState<string>(() => {
+    return localStorage.getItem('deal_selected_trade_id') || '';
+  });
+
+  const handleSelectTrade = (tradeId: string) => {
+    setSelectedTradeId(tradeId);
+    localStorage.setItem('deal_selected_trade_id', tradeId);
+  };
   const [journalSaveStatus, setJournalSaveStatus] = useState<string>('Tự động lưu khi nhập');
   const debounceTimersRef = useRef<Record<string, NodeJS.Timeout>>({});
+  const rawClosedTradesRef = useRef<any[]>([]);
 
-  // Checklists & Setup items
-  const [preChecklist, setPreChecklist] = useState<PreChecklistItem[]>(DEFAULT_PRE_CHECKLIST);
-  const [postMistakes, setPostMistakes] = useState<PostMistakeItem[]>(DEFAULT_POST_MISTAKES);
-  const [setupTags, setSetupTags] = useState<SetupTagItem[]>(DEFAULT_SETUP_TAGS);
+  // Checklists & Setup items persisted in localStorage
+  const [preChecklist, setPreChecklist] = useState<PreChecklistItem[]>(() => {
+    const saved = localStorage.getItem('deal_pre_checklist');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        console.warn('Failed to parse deal_pre_checklist', e);
+      }
+    }
+    return DEFAULT_PRE_CHECKLIST;
+  });
+
+  const [postMistakes, setPostMistakes] = useState<PostMistakeItem[]>(() => {
+    const saved = localStorage.getItem('deal_post_mistakes');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        console.warn('Failed to parse deal_post_mistakes', e);
+      }
+    }
+    return DEFAULT_POST_MISTAKES;
+  });
+
+  const [setupTags, setSetupTags] = useState<SetupTagItem[]>(() => {
+    const saved = localStorage.getItem('deal_setup_tags');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        console.warn('Failed to parse deal_setup_tags', e);
+      }
+    }
+    return DEFAULT_SETUP_TAGS;
+  });
+
+  const handleSaveChecklistConfig = (
+    newPre: PreChecklistItem[],
+    newPost: PostMistakeItem[],
+    newSetups: SetupTagItem[]
+  ) => {
+    setPreChecklist(newPre);
+    setPostMistakes(newPost);
+    setSetupTags(newSetups);
+    localStorage.setItem('deal_pre_checklist', JSON.stringify(newPre));
+    localStorage.setItem('deal_post_mistakes', JSON.stringify(newPost));
+    localStorage.setItem('deal_setup_tags', JSON.stringify(newSetups));
+  };
+
+  const handleResetChecklistConfig = () => {
+    setPreChecklist(DEFAULT_PRE_CHECKLIST);
+    setPostMistakes(DEFAULT_POST_MISTAKES);
+    setSetupTags(DEFAULT_SETUP_TAGS);
+    localStorage.removeItem('deal_pre_checklist');
+    localStorage.removeItem('deal_post_mistakes');
+    localStorage.removeItem('deal_setup_tags');
+  };
 
   // Settings State
   const [settings, setSettings] = useState<AppSettings>({
@@ -149,26 +349,76 @@ export default function App() {
     }
   });
 
+  const handleUpdateSettings = useCallback((newSettings: AppSettings) => {
+    setSettings(newSettings);
+    // Xóa bộ nhớ đệm trades giữa các tài khoản để đảm bảo tính toán lại theo múi giờ và thiết lập mới
+    tradesCacheRef.current = {};
+    if (rawClosedTradesRef.current && rawClosedTradesRef.current.length > 0) {
+      const targetAcc = accountsRef.current.find(a => a.id === selectedAccountIdRef.current);
+      let initialBalToUse = targetAcc?.initial_balance || 10000;
+      const reprocessed = processSupabaseTrades(
+        rawClosedTradesRef.current,
+        initialBalToUse,
+        100,
+        newSettings.contract_sizes,
+        newSettings.timezone_offset_hours
+      );
+      setTrades(reprocessed);
+    }
+  }, []);
+
   // Modal States
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isChecklistEditorOpen, setIsChecklistEditorOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [authUser, setAuthUser] = useState<any>(null);
   const [imageViewer, setImageViewer] = useState<{ isOpen: boolean; url: string; title: string }>({
     isOpen: false,
     url: '',
     title: '',
   });
 
+  // Lắng nghe trạng thái đăng nhập Supabase Auth
+  useEffect(() => {
+    getAuthUser().then(user => {
+      if (user) setAuthUser(user);
+    });
+
+    const sub = subscribeToAuthChanges((user) => {
+      setAuthUser(user);
+    });
+
+    return () => {
+      if (sub && typeof sub.unsubscribe === 'function') {
+        sub.unsubscribe();
+      }
+    };
+  }, []);
+
   // Search filter
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Table rows per page (default 5, supports 5, 10, 20, 99999 for All)
+  const [pageSize, setPageSize] = useState<number>(() => {
+    const saved = localStorage.getItem('deal_history_page_size');
+    return saved ? parseInt(saved, 10) || 5 : 5;
+  });
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    localStorage.setItem('deal_history_page_size', String(newSize));
+  };
 
   // Active base account
   const activeAccount = useMemo(() => {
     const found = accounts.find(a => a.id === selectedAccountId);
     if (found) return found;
+    if (accounts.length > 0) return accounts[0];
     return {
       id: selectedAccountId,
-      name: selectedAccountId === 'ALL' ? 'Tất cả tài khoản (ALL)' : `MT5 #${selectedAccountId}`,
-      ticket_server: selectedAccountId === 'ALL' ? 'Tất cả lệnh MT5' : `${selectedAccountId} (MT5 Live)`,
+      name: `MT5 #${selectedAccountId}`,
+      ticket_server: `${selectedAccountId} (MT5 Live)`,
       balance: 10000,
       initial_balance: 10000,
       pnl: 0,
@@ -184,33 +434,235 @@ export default function App() {
   // Load and calculate trades from Supabase:
   // 1. Tách biệt Lệnh Pending ('PENDING_PLAN', 'OPEN', 'PENDING') và Lệnh Closed ('CLOSED')
   // 2. Tính Running Balance trên mảng tăng dần, sau đó reverse để lệnh mới nhất lên đầu
-  const loadTrades = useCallback(async (targetAccountId?: string) => {
-    const accId = targetAccountId !== undefined ? targetAccountId : selectedAccountId;
-    setIsRefreshingSupabase(true);
-    setSupabaseStatus('loading');
+  const loadTrades = useCallback(async (targetAccountId?: string, isSilent = false) => {
+    const accId = targetAccountId !== undefined ? targetAccountId : selectedAccountIdRef.current;
+    if (!isSilent) {
+      setIsRefreshingSupabase(true);
+      setSupabaseStatus('loading');
+    }
 
     try {
       const data = await fetchTradesFromSupabase(String(accId));
+      const detectedAccounts: DetectedAccountInfo[] = (data as any)?.detectedAccounts || extractAccountsFromTrades(data);
+
+      const allRaw: any[] = (data as any)?.allRawTrades || data || [];
+
+      // Tự động chuyển sang tài khoản MT5 đang hoạt động nếu người dùng đang ở tài khoản cũ 26325348
+      if (Array.isArray(allRaw) && allRaw.length > 0 && accId === '26325348') {
+        const sortedNewest = [...allRaw].filter(t => t.close_time || t.open_time).sort((a, b) => {
+          const timeA = new Date((a.close_time || a.open_time || '').replace(/[.-]/g, '/')).getTime() || 0;
+          const timeB = new Date((b.close_time || b.open_time || '').replace(/[.-]/g, '/')).getTime() || 0;
+          return timeB - timeA;
+        });
+        const newestTrade = sortedNewest[0];
+        if (newestTrade) {
+          const newestAcc = String(
+            newestTrade.account_id ?? newestTrade.account ?? newestTrade.login ?? ''
+          ).replace(/^acc-/, '').trim();
+          if (newestAcc && newestAcc !== '26325348') {
+            console.log(`[Auto-Switch] Chuyển tự động sang tài khoản MT5 đang chạy lệnh: #${newestAcc}`);
+            selectedAccountIdRef.current = newestAcc;
+            setSelectedAccountId(newestAcc);
+            localStorage.setItem('deal_selected_account_id', newestAcc);
+            return loadTrades(newestAcc, isSilent);
+          }
+        }
+      }
+
+      // Gom toàn bộ lệnh closed theo account_id để tính số dư thực tế cho TOÀN BỘ tài khoản cùng lúc
+      const tradesByAccount = new Map<string, { totalNetPnl: number; count: number; initialBal?: number }>();
+      if (Array.isArray(allRaw)) {
+        allRaw.forEach(t => {
+          const rawAcc = String(
+            t.account_id ?? t.account ?? t.login ?? t.mt5_account ?? t.user_id ?? ''
+          ).replace(/^acc-/, '').trim();
+          if (!rawAcc || rawAcc === 'ALL') return;
+
+          const st = (t.status || 'CLOSED').toUpperCase().trim();
+          if (st === 'CLOSED') {
+            const pnl = Number(t.pnl || 0);
+            const comm = Number(t.commission || 0);
+            const sw = Number(t.swap || 0);
+            const net = Number((pnl + comm + sw).toFixed(2));
+            const init = t.initial_balance && !isNaN(Number(t.initial_balance)) && Number(t.initial_balance) > 0
+              ? Number(t.initial_balance)
+              : undefined;
+
+            const cur = tradesByAccount.get(rawAcc) || { totalNetPnl: 0, count: 0 };
+            cur.totalNetPnl = Number((cur.totalNetPnl + net).toFixed(2));
+            cur.count += 1;
+            if (!cur.initialBal && init) cur.initialBal = init;
+            tradesByAccount.set(rawAcc, cur);
+          }
+        });
+      }
+
+      // Cập nhật số dư và lãi lỗ cho TẤT CẢ tài khoản (không để tài khoản không active bị rơi về 10k)
+      setAccounts(prevAccounts => {
+        let hasChange = false;
+        const cleanedPrev = prevAccounts.filter(a => 
+          a && a.id && 
+          a.id !== 'ALL' && 
+          !String(a.id).startsWith('mock-') && 
+          !String(a.name || '').toLowerCase().includes('tất cả tài khoản')
+        );
+
+        const next = cleanedPrev.map(a => {
+          const cleanId = String(a.id).replace(/^acc-/, '').trim();
+          const accStats = tradesByAccount.get(cleanId);
+          if (accStats) {
+            let effectiveInit = accStats.initialBal;
+            if (!effectiveInit || effectiveInit === 10000) {
+              if (cleanId === '26325348') effectiveInit = 60000;
+              else if (cleanId === '26610983') effectiveInit = 100000;
+              else effectiveInit = a.initial_balance || 10000;
+            }
+            if (cleanId === '26325348' && effectiveInit > 90000) effectiveInit = 60000;
+            if (cleanId === '26610983' && effectiveInit < 80000) effectiveInit = 100000;
+
+            const calculatedBal = Number((effectiveInit + accStats.totalNetPnl).toFixed(2));
+            if (a.balance !== calculatedBal || a.pnl !== accStats.totalNetPnl || a.initial_balance !== effectiveInit) {
+              hasChange = true;
+              return {
+                ...a,
+                initial_balance: effectiveInit,
+                balance: calculatedBal,
+                pnl: accStats.totalNetPnl,
+              };
+            }
+          } else {
+            let init = a.initial_balance;
+            if (!init || init === 10000) {
+              if (cleanId === '26325348') init = 60000;
+              else if (cleanId === '26610983') init = 100000;
+              else init = 10000;
+            }
+            if (cleanId === '26325348' && init > 90000) init = 60000;
+            if (cleanId === '26610983' && init < 80000) init = 100000;
+            if (a.balance !== init || a.initial_balance !== init) {
+              hasChange = true;
+              return {
+                ...a,
+                initial_balance: init,
+                balance: init,
+              };
+            }
+          }
+          return a;
+        });
+
+        // Tự động thêm tài khoản MT5 mới phát hiện nếu chưa có
+        if (detectedAccounts && detectedAccounts.length > 0) {
+          detectedAccounts.forEach(d => {
+            const cleanId = String(d.id).replace(/^acc-/, '').trim();
+            if (!cleanId || cleanId === 'ALL' || cleanId.startsWith('mock-')) return;
+            const exists = next.some(
+              a => a.id === cleanId || a.id === `acc-${cleanId}` || String(a.id).replace(/^acc-/, '') === cleanId
+            );
+            if (!exists) {
+              hasChange = true;
+              const accStats = tradesByAccount.get(cleanId);
+              let initBal = d.initial_balance || accStats?.initialBal;
+              if (!initBal || initBal === 10000) {
+                if (cleanId === '26325348') initBal = 60000;
+                else if (cleanId === '26610983') initBal = 100000;
+                else initBal = 10000;
+              }
+              const bal = accStats ? Number((initBal + accStats.totalNetPnl).toFixed(2)) : initBal;
+              const newAcc: AccountInfo = {
+                id: cleanId,
+                name: `MT5 #${cleanId}`,
+                ticket_server: `${cleanId} (MT5 Live)`,
+                balance: bal,
+                initial_balance: initBal,
+                pnl: accStats?.totalNetPnl || 0,
+                win_rate: 0,
+                wins: 0,
+                losses: 0,
+                breakeven: 0,
+                connected: true,
+                currency: 'USD',
+              };
+              next.push(newAcc);
+              console.log(`[Auto-Account] Phát hiện tài khoản MT5 mới: #${cleanId}`);
+            }
+          });
+        }
+
+        if (hasChange || cleanedPrev.length !== prevAccounts.length) {
+          localStorage.setItem('deal_accounts_list', JSON.stringify(next));
+          return next;
+        }
+        return prevAccounts;
+      });
 
       if (data && data.length > 0) {
         // Tách biệt các lệnh CLOSED và PENDING
         const closedRaw = data.filter(d => (d.status || 'CLOSED').toUpperCase().trim() === 'CLOSED');
+        
+        // Tự động kế thừa plan_id và setup từ lệnh chờ gốc (thông qua position_id) nếu lệnh đóng chưa có plan
+        const pendingMapByTicket = new Map<string, any>();
+        data.forEach(d => {
+          if (d.ticket) pendingMapByTicket.set(String(d.ticket), d);
+        });
+        closedRaw.forEach(c => {
+          if (!c.plan_id && c.position_id) {
+            const parent = pendingMapByTicket.get(String(c.position_id));
+            if (parent && parent.plan_id) {
+              c.plan_id = parent.plan_id;
+              if (!c.notes && parent.notes) c.notes = parent.notes;
+              if (!c.setup && parent.setup) c.setup = parent.setup;
+              if (!c.plan_name && parent.plan_name) c.plan_name = parent.plan_name;
+            }
+          }
+        });
+
+        rawClosedTradesRef.current = closedRaw;
         const pendingOrOpenRaw = data.filter(d => {
           const st = (d.status || '').toUpperCase().trim();
           return st === 'PENDING_PLAN' || st === 'OPEN' || st === 'PENDING';
         });
 
         // 1. Xử lý các lệnh CLOSED:
-        // - Sắp xếp tăng dần theo close_time để tính Running Balance lũy kế
-        // - Đảo ngược (reverse) để hiển thị lệnh mới nhất lên đầu Bảng Lịch Sử
+        // Lấy initial_balance của đúng tài khoản đang load (từ accountsRef)
+        const targetAcc = accountsRef.current.find(a => a.id === accId) || activeAccount;
+        let initialBalToUse = targetAcc.initial_balance;
+        if (!initialBalToUse || initialBalToUse === 10000) {
+          if (accId === '26325348') initialBalToUse = 60000;
+          else if (accId === '26610983') initialBalToUse = 100000;
+          else initialBalToUse = 10000;
+        }
+        if (accId === '26325348' && initialBalToUse > 90000) initialBalToUse = 60000;
+        if (accId === '26610983' && initialBalToUse < 80000) initialBalToUse = 100000;
+
         const processed = processSupabaseTrades(
           closedRaw,
-          activeAccount.initial_balance,
+          initialBalToUse,
           100, // 1R mặc định $100 USD
           settings.contract_sizes,
           settings.timezone_offset_hours
         );
-        setTrades(processed);
+        setTrades(prevTrades => {
+          const prevMap = new Map<string, TradeRow>(prevTrades.map(t => [String(t.ticket || t.id), t]));
+          return processed.map(pt => {
+            const prev = prevMap.get(String(pt.ticket || pt.id));
+            if (!prev) return pt;
+            return {
+              ...pt,
+              htf_image_url: pt.htf_image_url || prev.htf_image_url || '',
+              image_url_1: pt.image_url_1 || prev.image_url_1 || '',
+              ltf_image_url: pt.ltf_image_url || prev.ltf_image_url || pt.image_base64 || prev.image_base64 || '',
+              image_base64: pt.image_base64 || prev.image_base64 || pt.ltf_image_url || prev.ltf_image_url || '',
+              notes: pt.notes || prev.notes,
+              setup: pt.setup || prev.setup,
+              timeframe: pt.timeframe || prev.timeframe,
+              plan_id: pt.plan_id || prev.plan_id,
+              plan_name: pt.plan_name || prev.plan_name,
+              pre_checklist_ids: pt.pre_checklist_ids && pt.pre_checklist_ids.length > 0 ? pt.pre_checklist_ids : prev.pre_checklist_ids,
+              post_checklist_ids: pt.post_checklist_ids && pt.post_checklist_ids.length > 0 ? pt.post_checklist_ids : prev.post_checklist_ids,
+            };
+          });
+        });
         setSupabaseStatus('connected');
         setSelectedTradeId(prev => {
           if (prev && processed.some(p => p.id === prev)) return prev;
@@ -218,59 +670,102 @@ export default function App() {
         });
 
         // 2. Tách biệt các lệnh PENDING_PLAN / OPEN sang Tab Lệnh Chờ
-        if (pendingOrOpenRaw.length > 0) {
-          const mappedPending: PendingOrder[] = pendingOrOpenRaw.map((p, idx) => {
-            const isSell = (p.type || '').toUpperCase().includes('SELL');
-            return {
-              id: p.id ? String(p.id) : `pending-${p.ticket || idx}`,
-              ticket: String(p.ticket || `P-${idx + 1}`),
-              symbol: p.symbol || 'XAU/USD',
-              type: isSell ? 'SELL' : 'BUY',
-              order_type: isSell ? 'SELL LIMIT' : 'BUY LIMIT',
-              volume: Number(p.volume || 0.1),
-              price: Number(p.open_price || 0),
-              sl: Number(p.initial_sl || 0),
-              tp: Number(p.close_price || 0),
-              status: 'PENDING',
-              placed_time: p.open_time || '',
-              plan_id: p.plan_id || null,
-            };
-          });
-          setPendingOrders(mappedPending);
-        }
+        const mappedPending: PendingOrder[] = pendingOrOpenRaw.map((p, idx) => {
+          const isSell = (p.type || '').toUpperCase().includes('SELL');
+          return {
+            id: p.id ? String(p.id) : `pending-${p.ticket || idx}`,
+            ticket: String(p.ticket || `P-${idx + 1}`),
+            symbol: p.symbol || 'XAU/USD',
+            type: isSell ? 'SELL' : 'BUY',
+            order_type: isSell ? 'SELL LIMIT' : 'BUY LIMIT',
+            volume: Number(p.volume || 0.1),
+            price: Number(p.open_price || 0),
+            sl: Number(p.initial_sl || 0),
+            tp: Number(p.close_price || 0),
+            status: 'PENDING',
+            placed_time: p.open_time || '',
+            plan_id: p.plan_id || null,
+          };
+        });
+        setPendingOrders(mappedPending);
+
+        // Lưu vào cache bộ nhớ để chuyển qua lại tức thì (0ms latency)
+        tradesCacheRef.current[String(accId)] = {
+          trades: processed,
+          pending: mappedPending,
+          rawClosed: closedRaw,
+        };
       } else {
         // Supabase chưa có dữ liệu hoặc không khớp account: Giữ mảng rỗng và hiển thị Empty State
         setTrades([]);
+        setPendingOrders([]);
         setSelectedTradeId('');
         setSupabaseStatus('connected');
+        tradesCacheRef.current[String(accId)] = {
+          trades: [],
+          pending: [],
+          rawClosed: [],
+        };
       }
     } catch (err) {
       console.warn('Không thể nạp trades từ Supabase:', err);
-      setTrades([]);
-      setSelectedTradeId('');
-      setSupabaseStatus('error');
+      if (!isSilent) {
+        setTrades([]);
+        setPendingOrders([]);
+        setSelectedTradeId('');
+        setSupabaseStatus('error');
+      }
     } finally {
-      setIsRefreshingSupabase(false);
+      if (!isSilent) {
+        setIsRefreshingSupabase(false);
+      }
       const now = new Date();
       setLastSyncTime(now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     }
-  }, [selectedAccountId, activeAccount.initial_balance, settings.contract_sizes, settings.timezone_offset_hours]);
+  }, [settings.contract_sizes, settings.timezone_offset_hours, activeAccount]);
 
-  // Tự động gọi API Supabase lấy dữ liệu thật khi mount hoặc khi thay đổi account_id
+  // Tự động gọi API Supabase, lắng nghe Realtime WebSocket và Heartbeat Auto-polling
   useEffect(() => {
+    // 1. Nạp dữ liệu ngay khi mount hoặc khi đổi tài khoản
     loadTrades(selectedAccountId);
+
+    // 2. Kênh Realtime WebSocket: Bắt sự kiện ngay khi MT5 chốt lệnh đẩy lên Supabase (~0.1s)
+    const unsubscribe = subscribeToTradesRealtime(() => {
+      console.log('⚡ [Realtime] Phát hiện biến động lệnh từ Supabase, tự động đồng bộ...');
+      loadTrades(selectedAccountIdRef.current, true);
+    });
+
+    // 3. Heartbeat Auto-polling định kỳ mỗi 15 giây (chạy ngầm êm ái, đảm bảo 100% không sót lệnh)
+    const intervalId = setInterval(() => {
+      loadTrades(selectedAccountIdRef.current, true);
+    }, 15000);
+
+    // 4. Đồng bộ tức thì khi người dùng chuyển từ cửa sổ MT5 quay lại cửa sổ Web App
+    const handleFocusOrVisible = () => {
+      if (!document.hidden) {
+        loadTrades(selectedAccountIdRef.current, true);
+      }
+    };
+
+    window.addEventListener('focus', handleFocusOrVisible);
+    document.addEventListener('visibilitychange', handleFocusOrVisible);
+
+    return () => {
+      unsubscribe();
+      clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocusOrVisible);
+      document.removeEventListener('visibilitychange', handleFocusOrVisible);
+    };
   }, [loadTrades, selectedAccountId]);
 
   // Nạp danh sách Plans từ Supabase theo selectedAccountId
   const loadPlans = useCallback(async (accId: string = selectedAccountId) => {
     try {
-      const remotePlans = await fetchPlansFromSupabase(accId);
-      if (remotePlans && remotePlans.length > 0) {
-        setPlans(remotePlans);
-      } else {
-        setPlans([]);
-      }
-      return remotePlans;
+      const cleanAccId = String(accId || '').replace(/^acc-/, '').trim();
+      const remotePlans = await fetchPlansFromSupabase(cleanAccId);
+      // Luôn setPlans kể cả khi rỗng [] để tài khoản không bị dính plan của tài khoản trước
+      setPlans(remotePlans || []);
+      return remotePlans || [];
     } catch (err) {
       console.warn('Không thể nạp danh sách Plans:', err);
       setPlans([]);
@@ -286,24 +781,45 @@ export default function App() {
   // Vì trades đã được reverse để lệnh mới nhất lên đầu, nên trades[0] chính là lệnh gần nhất có running_balance mới nhất!
   const dynamicAccount = useMemo(() => {
     const isNoiseFilterActive = getSavedNoiseFilter();
+    const cleanActiveId = String(selectedAccountId).replace(/^acc-/, '').trim();
+    const currentAccount = accounts.find(a => String(a.id).replace(/^acc-/, '').trim() === cleanActiveId) || activeAccount;
+
+    // KIỂM TRA BẢO VỆ: Chỉ tính toán từ mảng trades nếu mảng trades thực sự thuộc về selectedAccountId!
+    const isMatchingTrades = trades.length > 0 && trades.every(t => {
+      const tAcc = String(t.account_id || '').replace(/^acc-/, '').trim();
+      return !tAcc || tAcc === cleanActiveId;
+    });
+
+    if (!isMatchingTrades || trades.length === 0) {
+      return {
+        ...currentAccount,
+        balance: currentAccount.balance ?? currentAccount.initial_balance ?? 10000,
+        pnl: currentAccount.pnl ?? 0,
+        wins: currentAccount.wins ?? 0,
+        losses: currentAccount.losses ?? 0,
+        breakeven: currentAccount.breakeven ?? 0,
+        win_rate: currentAccount.win_rate ?? 0,
+        total_rr: 0,
+        noise_count: 0,
+      };
+    }
+
     const stats = computeTradeStatistics(trades, isNoiseFilterActive);
     const totalNetPnl = trades.reduce((sum, t) => sum + (t.net_pnl || 0), 0);
-    const latestRunningBalance = trades.length > 0
-      ? (trades[0].running_balance ?? (activeAccount.initial_balance + totalNetPnl))
-      : activeAccount.initial_balance;
+    const latestRunningBalance = trades[0]?.running_balance ?? (currentAccount.initial_balance + totalNetPnl);
 
     return {
-      ...activeAccount,
+      ...currentAccount,
       balance: Number((latestRunningBalance ?? 0).toFixed(2)),
       pnl: Number((totalNetPnl ?? 0).toFixed(2)),
-      wins: stats.wins,
-      losses: stats.losses,
-      breakeven: stats.breakeven,
-      win_rate: Number((stats.winRate ?? 0).toFixed(1)),
-      total_rr: stats.totalRR,
-      noise_count: stats.noiseTradesCount,
+      wins: stats?.wins ?? 0,
+      losses: stats?.losses ?? 0,
+      breakeven: stats?.breakeven ?? 0,
+      win_rate: Number((stats?.winRate ?? 0).toFixed(1)),
+      total_rr: stats?.totalRR ?? 0,
+      noise_count: stats?.noiseTradesCount ?? 0,
     };
-  }, [trades, activeAccount]);
+  }, [trades, activeAccount, accounts, selectedAccountId]);
 
   // Active selected trade (hỗ trợ cả lệnh khớp và lệnh chờ PENDING)
   const activeTrade = useMemo(() => {
@@ -318,6 +834,8 @@ export default function App() {
     if (foundPending) {
       const isSell = (foundPending.type || '').toUpperCase().includes('SELL');
       const orderType: TradeType = isSell ? 'SELL' : 'BUY';
+      const cached = getTradeJournalFromLocalCache(foundPending.ticket);
+      const cachedHtf = cached?.htf_image_url || cached?.pre_image || cached?.image_open || cached?.image_url_1;
       return {
         id: foundPending.id || `pending-${foundPending.ticket}`,
         ticket: String(foundPending.ticket),
@@ -339,16 +857,20 @@ export default function App() {
         net_pnl: 0,
         weighted_rr: 0,
         lost_profit: 0,
-        timeframe: 'M15',
+        timeframe: cached?.timeframe || 'M15',
         session: 'Á' as any,
-        pre_checklist_ids: [],
-        post_checklist_ids: [],
-        notes: foundPending.notes || '',
-        plan_id: foundPending.plan_id,
-        plan_name: foundPending.plan_title,
+        pre_checklist_ids: cached?.pre_checklist_ids || [],
+        post_checklist_ids: cached?.post_checklist_ids || [],
+        notes: cached?.notes || foundPending.notes || '',
+        plan_id: cached?.plan_id || foundPending.plan_id,
+        plan_name: cached?.plan_name || foundPending.plan_title,
         status: 'PENDING',
         is_noise: foundPending.volume <= 0.01,
-        result: 'BE' as any
+        result: 'BE' as any,
+        htf_image_url: cachedHtf,
+        image_url_1: cachedHtf,
+        ltf_image_url: cached?.ltf_image_url,
+        image_base64: cached?.image_base64,
       };
     }
     return trades[0] || null;
@@ -362,9 +884,67 @@ export default function App() {
     return Array.from(set).sort();
   }, [trades, pendingOrders]);
 
-  // Update account name handler
+  // Update account (Name & Tiền gốc / Initial Balance) and persist to localStorage
+  const handleUpdateAccount = useCallback((accId: string, updates: { name?: string; initial_balance?: number }) => {
+    setAccounts(prevAccounts => {
+      const exists = prevAccounts.some(a => a.id === accId);
+      let next: AccountInfo[];
+      if (exists) {
+        next = prevAccounts.map(a => {
+          if (a.id === accId) {
+            const newInit = updates.initial_balance !== undefined ? updates.initial_balance : (a.initial_balance ?? 10000);
+            const currentPnl = a.pnl || 0;
+            return {
+              ...a,
+              name: updates.name !== undefined ? updates.name : a.name,
+              initial_balance: newInit,
+              balance: Number((newInit + currentPnl).toFixed(2)),
+            };
+          }
+          return a;
+        });
+      } else {
+        const initBal = updates.initial_balance ?? 10000;
+        next = [
+          ...prevAccounts,
+          {
+            id: accId,
+            name: updates.name || `MT5 #${accId}`,
+            ticket_server: `${accId} (MT5 Live)`,
+            balance: initBal,
+            initial_balance: initBal,
+            pnl: 0,
+            win_rate: 0,
+            wins: 0,
+            losses: 0,
+            breakeven: 0,
+            connected: true,
+            currency: 'USD',
+          }
+        ];
+      }
+      localStorage.setItem('deal_accounts_list', JSON.stringify(next));
+      return next;
+    });
+
+    // Cập nhật ngay lập tức Running Balance của các lệnh giao dịch nếu thay đổi Tiền gốc
+    if (updates.initial_balance !== undefined && accId === selectedAccountId && rawClosedTradesRef.current.length > 0) {
+      const processed = processSupabaseTrades(
+        rawClosedTradesRef.current,
+        updates.initial_balance,
+        100,
+        settings.contract_sizes,
+        settings.timezone_offset_hours
+      );
+      setTrades(processed);
+      if (tradesCacheRef.current[String(accId)]) {
+        tradesCacheRef.current[String(accId)].trades = processed;
+      }
+    }
+  }, [selectedAccountId, settings.contract_sizes, settings.timezone_offset_hours]);
+
   const handleUpdateAccountName = (newName: string) => {
-    setAccounts(prev => prev.map(a => a.id === selectedAccountId ? { ...a, name: newName } : a));
+    handleUpdateAccount(selectedAccountId, { name: newName });
   };
 
   // Update a trade in list with 300ms debounced persistence to Supabase
@@ -382,7 +962,7 @@ export default function App() {
 
     debounceTimersRef.current[tradeKey] = setTimeout(async () => {
       try {
-        const success = await updateTradeJournalOnSupabase(
+        const res = await updateTradeJournalOnSupabase(
           updated.id,
           updated.ticket,
           {
@@ -394,17 +974,17 @@ export default function App() {
             post_checklist_ids: updated.post_checklist_ids,
             plan_pnl: updated.plan_pnl,
             lost_profit: updated.lost_profit,
-            image_url_1: updated.image_url_1 || updated.htf_image_url,
-            htf_image_url: updated.htf_image_url || updated.image_url_1,
-            image_base64: updated.image_base64 || updated.ltf_image_url,
-            ltf_image_url: updated.ltf_image_url || updated.image_base64,
+            image_url_1: updated.image_url_1 || undefined,
+            htf_image_url: updated.htf_image_url || undefined,
+            image_base64: updated.image_base64 || updated.ltf_image_url || undefined,
+            ltf_image_url: updated.ltf_image_url || updated.image_base64 || undefined,
             plan_id: updated.plan_id,
             plan_name: updated.plan_name,
           },
           updated.account_id || selectedAccountId
         );
 
-        if (success) {
+        if (res && res.success) {
           setJournalSaveStatus('Đã lưu Supabase');
           setTimeout(() => {
             setJournalSaveStatus('Tự động lưu khi nhập');
@@ -478,7 +1058,7 @@ export default function App() {
       close_time: new Date(Date.now() + 3600000).toISOString().replace('T', ' ').slice(0, 19),
       timeframe: 'M15',
       session: determineSession(new Date().toISOString(), settings.timezone_offset_hours),
-      pre_checklist_ids: ['bias', 'poi', 'liquidity', 'session', 'sl_safe', 'rr_ratio'],
+      pre_checklist_ids: order.plan_id ? parseChecklistArray(plans.find(p => p.id === order.plan_id)?.checklist) : [],
       post_checklist_ids: [],
       notes: `Lệnh limit #${order.ticket} cào từ MT5 đã khớp tự động. ${order.notes || ''}`,
       plan_id: order.plan_id, // Giữ nguyên Plan đã gán!
@@ -506,13 +1086,44 @@ export default function App() {
     loadTrades(selectedAccountId);
   };
 
-  // Add plan and sync to Supabase with status PENDING
-  const handleAddPlan = async (newPlan: TradingPlan) => {
-    setPlans(prev => [newPlan, ...prev]);
+  // Add or update plan and sync to Supabase
+  const handleAddPlan = async (planToSave: TradingPlan) => {
+    const cleanAccount = String(planToSave.account_id || selectedAccountId).replace(/^acc-/, '').trim();
+    const finalPlan = { ...planToSave, account_id: cleanAccount };
+    setPlans(prev => {
+      const idx = prev.findIndex(p => p.id === finalPlan.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = finalPlan;
+        return next;
+      }
+      return [finalPlan, ...prev];
+    });
     try {
-      await savePlanToSupabase(newPlan);
+      const res = await savePlanToSupabase(finalPlan);
+      if (res?.plan && res.plan.id !== finalPlan.id) {
+        setPlans(prev => prev.map(p => p.id === finalPlan.id ? res.plan : p));
+      }
     } catch (err) {
       console.warn('Không thể lưu Plan lên Supabase (đã lưu LocalStorage):', err);
+    }
+  };
+
+  const handleDeletePlan = async (planId: string) => {
+    setPlans(prev => prev.filter(p => p.id !== planId));
+    try {
+      await deletePlanFromSupabase(planId);
+    } catch (err) {
+      console.warn('Không thể xoá Plan khỏi Supabase (đã xoá LocalStorage):', err);
+    }
+  };
+
+  const handleUpdatePlanStatus = async (planId: string, status: 'PENDING' | 'EXECUTED' | 'CANCELLED') => {
+    setPlans(prev => prev.map(p => p.id === planId ? { ...p, status } : p));
+    try {
+      await updatePlanStatusOnSupabase(planId, status);
+    } catch (err) {
+      console.warn('Không thể cập nhật status Plan lên Supabase (đã lưu LocalStorage):', err);
     }
   };
 
@@ -542,6 +1153,9 @@ export default function App() {
     const selectedPlan = planObj || plans.find(p => p.id === planId);
     if (!selectedPlan) return;
 
+    // Clone độc lập checklist từ Plan để đảm bảo DECOUPLED hoàn toàn
+    const clonedChecklist = parseChecklistArray(selectedPlan.checklist);
+
     // 1. Đồng bộ metadata từ Plan sang Pending Orders nếu là lệnh chờ
     setPendingOrders(prev => prev.map(p => {
       if (p.id === tradeId || `pending-${p.ticket}` === tradeId || String(p.ticket) === tradeId) {
@@ -567,9 +1181,9 @@ export default function App() {
           notes: selectedPlan.notes 
             ? (t.notes ? `${selectedPlan.notes}\n---\n${t.notes}` : selectedPlan.notes) 
             : t.notes,
-          pre_checklist_ids: selectedPlan.checklist && selectedPlan.checklist.length > 0 
-            ? selectedPlan.checklist 
-            : t.pre_checklist_ids,
+          pre_checklist_ids: clonedChecklist.length > 0 
+            ? [...clonedChecklist] 
+            : (t.pre_checklist_ids || []),
           image_url_1: selectedPlan.image_url || t.image_url_1 || t.htf_image_url,
           htf_image_url: selectedPlan.image_url || t.htf_image_url,
         };
@@ -577,7 +1191,7 @@ export default function App() {
       return t;
     }));
 
-    // 2. Chuyển status Plan sang EXECUTED
+    // 3. Chuyển status Plan sang EXECUTED
     setPlans(prev => {
       const exists = prev.some(p => p.id === selectedPlan.id);
       if (exists) {
@@ -586,16 +1200,18 @@ export default function App() {
       return [{ ...selectedPlan, status: 'EXECUTED' }, ...prev];
     });
 
-    // 3. Đẩy đồng bộ lên Supabase
+    // 4. Đẩy đồng bộ lên Supabase
     const targetTrade = trades.find(t => t.id === tradeId);
     if (targetTrade) {
+      const newTradeChecklist = clonedChecklist.length > 0 ? [...clonedChecklist] : (targetTrade.pre_checklist_ids || []);
       await updateTradeMappingOnSupabase(targetTrade.id, targetTrade.ticket, {
         plan_id: selectedPlan.id,
         plan_name: selectedPlan.plan_name || selectedPlan.title,
         timeframe: selectedPlan.timeframe,
         setup: selectedPlan.setup,
         notes: selectedPlan.notes,
-        pre_checklist_ids: selectedPlan.checklist,
+        pre_checklist_ids: newTradeChecklist,
+        checklist: newTradeChecklist,
         image_url_1: selectedPlan.image_url,
       }, targetTrade.account_id || selectedAccountId);
     } else {
@@ -607,7 +1223,8 @@ export default function App() {
           timeframe: selectedPlan.timeframe,
           setup: selectedPlan.setup,
           notes: selectedPlan.notes,
-          pre_checklist_ids: selectedPlan.checklist,
+          pre_checklist_ids: clonedChecklist.length > 0 ? [...clonedChecklist] : undefined,
+          checklist: clonedChecklist.length > 0 ? [...clonedChecklist] : undefined,
           image_url_1: selectedPlan.image_url,
         }, selectedAccountId);
       }
@@ -620,35 +1237,21 @@ export default function App() {
       {/* 1. APP SHELL SIDEBAR */}
       <Sidebar
         currentTab={currentTab}
-        onTabChange={setCurrentTab}
+        onTabChange={handleTabChange}
         accounts={accounts}
         selectedAccountId={selectedAccountId}
-        onSelectAccount={setSelectedAccountId}
+        onSelectAccount={handleAccountIdChange}
         onOpenSettings={() => setIsSettingsOpen(true)}
         isDarkMode={isDarkMode}
         onToggleTheme={handleToggleTheme}
-        onAddAccount={() => {
-          const newId = prompt('Nhập Account ID MT5 mới:');
-          if (newId && newId.trim()) {
-            const cleanId = newId.trim();
-            setAccounts(prev => [
-              ...prev,
-              {
-                id: cleanId,
-                name: `MT5 #${cleanId}`,
-                ticket_server: `${cleanId} (MT5 Live)`,
-                balance: 10000,
-                initial_balance: 10000,
-                pnl: 0,
-                win_rate: 0,
-                wins: 0,
-                losses: 0,
-                breakeven: 0,
-                total_rr: 0,
-              }
-            ]);
-            setSelectedAccountId(cleanId);
-          }
+        activeAccount={dynamicAccount}
+        onAddAccount={(newAcc: AccountInfo) => {
+          setAccounts(prev => {
+            const next = [...prev, newAcc];
+            localStorage.setItem('deal_accounts_list', JSON.stringify(next));
+            return next;
+          });
+          handleAccountIdChange(newAcc.id);
         }}
       />
 
@@ -659,12 +1262,20 @@ export default function App() {
           currentTab={currentTab}
           activeAccount={dynamicAccount}
           selectedAccountId={selectedAccountId}
-          onAccountIdChange={setSelectedAccountId}
+          onAccountIdChange={handleAccountIdChange}
           onUpdateAccountName={handleUpdateAccountName}
+          accounts={accounts}
+          onUpdateAccount={handleUpdateAccount}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onOpenImport={() => setIsImportOpen(true)}
+          authUser={authUser}
+          onOpenAuth={() => setIsAuthOpen(true)}
+          onSignOut={async () => {
+            await signOutAuthUser();
+            setAuthUser(null);
+          }}
           supabaseStatus={supabaseStatus}
           onSync={() => loadTrades(selectedAccountId)}
           isSyncing={isRefreshingSupabase}
@@ -688,6 +1299,8 @@ export default function App() {
           hideNoiseRows={hideNoiseRows}
           onToggleHideNoiseRows={handleToggleHideNoiseRows}
           onResetFilters={handleResetFilters}
+          pageSize={pageSize}
+          onPageSizeChange={handlePageSizeChange}
         />
 
         {/* VIEW CONTAINER BY TAB */}
@@ -696,15 +1309,15 @@ export default function App() {
               TAB LỊCH SỬ (UNIFIED CLOSED HISTORY & PENDING ORDERS)
              ======================================================== */}
           {currentTab === 'lich-su' && (
-            <div className="flex flex-col min-h-full">
-              {/* BẢNG LỊCH SỬ DUY NHẤT (GOM LỆNH KHỚP + LỆNH CHỜ, LỌC HÀNG 1 Ở HEADER) */}
-              <div className="border-b border-[var(--border-main)]">
+            <div className="flex flex-col min-h-full py-4 px-4 sm:px-6 lg:px-[8%] xl:px-[10%] space-y-4 max-w-[1700px] mx-auto w-full transition-all font-sans">
+              {/* 1. BẢNG DỮ LIỆU MT5 (FULL WIDTH PHÍA TRÊN) */}
+              <div className="w-full">
                 <HistoryTable
                   trades={trades}
                   pendingOrders={pendingOrders}
                   plans={plans}
                   selectedTradeId={selectedTradeId}
-                  onSelectTrade={(trade) => setSelectedTradeId(trade.id)}
+                  onSelectTrade={(trade) => handleSelectTrade(trade.id)}
                   searchFilter={searchQuery}
                   onSearchChange={setSearchQuery}
                   isLoading={isRefreshingSupabase}
@@ -722,13 +1335,25 @@ export default function App() {
                   selectedSetup={selectedSetup}
                   noiseFilterActive={noiseFilterActive}
                   hideNoiseRows={hideNoiseRows}
+                  pageSize={pageSize}
+                  onPageSizeChange={handlePageSizeChange}
+                  onSymbolChange={setSelectedSymbol}
+                  onTypeChange={setSelectedType}
+                  onSessionChange={setSelectedSession}
+                  onResultChange={setSelectedResult}
+                  onSetupChange={setSelectedSetup}
+                  onToggleHideNoiseRows={() => setHideNoiseRows(!hideNoiseRows)}
+                  onResetFilters={handleResetFilters}
+                  setupTags={setupTags}
+                  uniqueSymbols={uniqueSymbols}
                 />
               </div>
 
-              {/* CARD CHI TIẾT LỆNH (LAYOUT PHÍA DƯỚI BẢNG) */}
-              <div className="flex-1">
+              {/* 2. CARD CHI TIẾT LỆNH & CHECKLIST TRONG 1 KHUNG */}
+              <div className="w-full">
                 <TradeDetailCard
                   trade={activeTrade}
+                  allTrades={trades}
                   plans={plans}
                   accountId={selectedAccountId}
                   preChecklistItems={preChecklist}
@@ -739,6 +1364,7 @@ export default function App() {
                   onUpdateTrade={handleUpdateTrade}
                   onMapPlanToTrade={handleMapPlanToTrade}
                   onOpenSettingsModal={() => setIsSettingsOpen(true)}
+                  onOpenChecklistEditor={() => setIsChecklistEditorOpen(true)}
                   onViewImage={(url, title) => setImageViewer({ isOpen: true, url, title })}
                 />
               </div>
@@ -751,6 +1377,7 @@ export default function App() {
               trades={trades}
               activeAccount={activeAccount}
               onNavigateToHistory={() => setCurrentTab('lich-su')}
+              hideNoiseRows={hideNoiseRows}
             />
           )}
 
@@ -762,8 +1389,11 @@ export default function App() {
               accountId={selectedAccountId}
               selectedAccountId={selectedAccountId}
               preChecklist={preChecklist}
+              postMistakes={postMistakes}
               setupTags={setupTags}
               onAddPlan={handleAddPlan}
+              onDeletePlan={handleDeletePlan}
+              onUpdatePlanStatus={handleUpdatePlanStatus}
               onReloadPlans={() => loadPlans(selectedAccountId)}
               onNavigateToHistory={() => setCurrentTab('lich-su')}
               onViewImage={(url, title) => setImageViewer({ isOpen: true, url, title })}
@@ -774,11 +1404,30 @@ export default function App() {
             />
           )}
 
+          {/* TAB BIỂU ĐỒ (TRADE EXECUTION CHART) - GIỮ SỐNG TRONG DOM ĐỂ KHÔNG BỊ MẤT BẢN VẼ KHI CHUYỂN TAB */}
+          <div className={currentTab === 'bieu-do' ? 'w-full h-full block' : 'hidden'}>
+            <ChartTab
+              trades={trades}
+              activeAccount={activeAccount}
+              selectedTradeId={selectedTradeId}
+              onSelectTrade={(tr) => setSelectedTradeId(tr.id)}
+              timezoneOffset={settings.timezone_offset_hours}
+            />
+          </div>
+
           {/* TAB BÁO CÁO */}
           {currentTab === 'bao-cao' && (
             <ReportsTab
               trades={trades}
               activeAccount={activeAccount}
+              plans={plans}
+              hideNoiseRows={hideNoiseRows}
+              preChecklist={preChecklist}
+              timezoneOffset={settings.timezone_offset_hours}
+              onSelectTrade={(tr) => {
+                setSelectedTradeId(tr?.id || tr?.ticket || null);
+                setCurrentTab('lich-su');
+              }}
             />
           )}
 
@@ -786,7 +1435,7 @@ export default function App() {
           {currentTab === 'cai-dat' && (
             <SettingsTab
               settings={settings}
-              onUpdateSettings={setSettings}
+              onUpdateSettings={handleUpdateSettings}
               accounts={accounts}
             />
           )}
@@ -795,32 +1444,60 @@ export default function App() {
 
       {/* 3. MODALS */}
       {/* Settings Modal (opened via Header Cog) */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        settings={settings}
-        onUpdateSettings={setSettings}
-        preChecklist={preChecklist}
-        onUpdatePreChecklist={setPreChecklist}
-        postMistakes={postMistakes}
-        onUpdatePostMistakes={setPostMistakes}
-        onRefreshSupabase={() => loadTrades(selectedAccountId)}
-      />
+      {isSettingsOpen && (
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          settings={settings}
+          onUpdateSettings={handleUpdateSettings}
+          preChecklist={preChecklist}
+          onUpdatePreChecklist={setPreChecklist}
+          postMistakes={postMistakes}
+          onUpdatePostMistakes={setPostMistakes}
+          onRefreshSupabase={() => loadTrades(selectedAccountId)}
+        />
+      )}
+
+      {/* Checklist & Scoring Editor Modal (opened via Checklist panel header Cog) */}
+      {isChecklistEditorOpen && (
+        <ChecklistEditorModal
+          isOpen={isChecklistEditorOpen}
+          onClose={() => setIsChecklistEditorOpen(false)}
+          preChecklistItems={preChecklist}
+          postMistakeItems={postMistakes}
+          setupTags={setupTags}
+          onSave={handleSaveChecklistConfig}
+          onResetDefaults={handleResetChecklistConfig}
+        />
+      )}
 
       {/* Import Modal (opened via Header "Nạp Import" button) */}
-      <ImportModal
-        isOpen={isImportOpen}
-        onClose={() => setIsImportOpen(false)}
-        onImportTrades={handleImportTrades}
-        onResetDemoData={handleResetDemoData}
-      />
+      {isImportOpen && (
+        <ImportModal
+          isOpen={isImportOpen}
+          onClose={() => setIsImportOpen(false)}
+          onImportTrades={handleImportTrades}
+          onResetDemoData={handleResetDemoData}
+        />
+      )}
 
       {/* Fullscreen Image Zoom Viewer */}
-      <ImageViewerModal
-        isOpen={imageViewer.isOpen}
-        onClose={() => setImageViewer({ isOpen: false, url: '', title: '' })}
-        imageUrl={imageViewer.url}
-        title={imageViewer.title}
+      {imageViewer.isOpen && (
+        <ImageViewerModal
+          isOpen={imageViewer.isOpen}
+          onClose={() => setImageViewer({ isOpen: false, url: '', title: '' })}
+          imageUrl={imageViewer.url}
+          title={imageViewer.title}
+        />
+      )}
+
+      {/* Auth Modal (Đăng nhập / Đăng ký Google, GitHub, Email) */}
+      <AuthModal
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
+        onSuccess={() => {
+          setIsAuthOpen(false);
+        }}
       />
     </div>
   );

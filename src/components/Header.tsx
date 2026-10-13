@@ -19,9 +19,12 @@ import {
   X,
   Clock,
   Eye,
-  EyeOff
+  EyeOff,
+  Globe,
+  User
 } from 'lucide-react';
 import { AccountInfo, SetupTagItem } from '../types';
+import { useLanguage } from '../context/LanguageContext';
 
 interface HeaderProps {
   currentTab?: string;
@@ -29,6 +32,8 @@ interface HeaderProps {
   selectedAccountId: string;
   onAccountIdChange: (accId: string) => void;
   onUpdateAccountName?: (newName: string) => void;
+  accounts?: AccountInfo[];
+  onUpdateAccount?: (accId: string, updates: { name?: string; initial_balance?: number }) => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
   onOpenSettings: () => void;
@@ -37,9 +42,11 @@ interface HeaderProps {
   onSync: () => void;
   isSyncing?: boolean;
   lastSyncTime?: string | null;
-  isDarkMode: boolean;
-  onToggleTheme: () => void;
+  isDarkMode?: boolean;
+  onToggleTheme?: () => void;
   timezoneOffset?: number;
+  pageSize?: number;
+  onPageSizeChange?: (size: number) => void;
 
   // Smart Dropdown Filter Props
   uniqueSymbols?: string[];
@@ -59,6 +66,9 @@ interface HeaderProps {
   hideNoiseRows?: boolean;
   onToggleHideNoiseRows?: () => void;
   onResetFilters?: () => void;
+  authUser?: any;
+  onOpenAuth?: () => void;
+  onSignOut?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -67,10 +77,15 @@ export const Header: React.FC<HeaderProps> = ({
   selectedAccountId,
   onAccountIdChange,
   onUpdateAccountName,
+  accounts = [],
+  onUpdateAccount,
   searchQuery,
   onSearchChange,
   onOpenSettings,
   onOpenImport,
+  authUser,
+  onOpenAuth,
+  onSignOut,
   supabaseStatus = 'demo',
   onSync,
   isSyncing = false,
@@ -78,6 +93,8 @@ export const Header: React.FC<HeaderProps> = ({
   isDarkMode,
   onToggleTheme,
   timezoneOffset = 0,
+  pageSize = 5,
+  onPageSizeChange,
 
   // Dropdown filter props
   uniqueSymbols = [],
@@ -98,22 +115,33 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleHideNoiseRows,
   onResetFilters,
 }) => {
-  // Account Name Edit State
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [nameInput, setNameInput] = useState(activeAccount.name || '');
+  const { t, language, setLanguage } = useLanguage();
 
-  // Synchronize when activeAccount changes
+  // Account Edit Popover State
+  const [isAccountEditOpen, setIsAccountEditOpen] = useState(false);
+  const [editName, setEditName] = useState(activeAccount.name || '');
+  const [editInitBalance, setEditInitBalance] = useState(String(activeAccount.initial_balance ?? 10000));
+  const accountRef = useRef<HTMLDivElement>(null);
+
+  // Synchronize when activeAccount or selectedAccountId changes
   useEffect(() => {
-    setNameInput(activeAccount.name || '');
-  }, [activeAccount.name]);
+    setEditName(activeAccount.name || '');
+    setEditInitBalance(String(activeAccount.initial_balance ?? 10000));
+  }, [activeAccount.name, activeAccount.initial_balance, selectedAccountId]);
 
-  const handleNameSubmit = (e?: React.FormEvent) => {
+  const handleAccountSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const clean = nameInput.trim();
-    if (clean && onUpdateAccountName) {
-      onUpdateAccountName(clean);
+    const cleanName = editName.trim();
+    const cleanBalance = parseFloat(editInitBalance) || 0;
+    if (onUpdateAccount) {
+      onUpdateAccount(selectedAccountId, {
+        name: cleanName || activeAccount.name,
+        initial_balance: cleanBalance,
+      });
+    } else if (onUpdateAccountName && cleanName) {
+      onUpdateAccountName(cleanName);
     }
-    setIsEditingName(false);
+    setIsAccountEditOpen(false);
   };
 
   // Popover States
@@ -126,6 +154,9 @@ export const Header: React.FC<HeaderProps> = ({
   // Close popovers on click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      if (accountRef.current && !accountRef.current.contains(event.target as Node)) {
+        setIsAccountEditOpen(false);
+      }
       if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
         setIsSettingsOpen(false);
       }
@@ -152,91 +183,376 @@ export const Header: React.FC<HeaderProps> = ({
   const isLoss = activeAccount.pnl < 0;
 
   return (
-    <header className="h-16 px-5 bg-[var(--bg-card)] border-b border-[var(--border-main)] flex items-center justify-between gap-4 select-none shrink-0 transition-colors duration-200 z-30 relative">
+    <header className="h-16 px-5 lg:px-6 bg-[var(--bg-card)]/90 backdrop-blur-md border-b border-[var(--border-main)] flex items-center justify-between gap-4 select-none shrink-0 transition-colors duration-200 z-30 relative shadow-sm">
       {/* ========================================================
           LEFT: Tên & ID Tài Khoản + Settings Popover + Dropdown Filter + Search Bar
          ======================================================== */}
       <div className="flex items-center gap-2.5 flex-wrap">
-        {/* 1. Tên & ID Tài Khoản (Cho phép chỉnh sửa tên hiển thị - Tuyệt đối không để chú thích rác bên dưới) */}
-        <div className="flex items-center bg-[var(--bg-subtle)] border border-[var(--border-main)] rounded-lg px-2.5 py-1 text-xs">
-          {isEditingName ? (
-            <form onSubmit={handleNameSubmit} className="flex items-center gap-1">
-              <input
-                type="text"
-                autoFocus
-                value={nameInput}
-                onChange={(e) => setNameInput(e.target.value)}
-                onBlur={() => handleNameSubmit()}
-                placeholder="Tên tài khoản"
-                className="w-32 px-1.5 py-0.5 bg-[var(--bg-input)] border border-teal-500 rounded text-[var(--text-primary)] font-semibold text-xs focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => handleNameSubmit()}
-                className="p-1 rounded text-teal-400 hover:bg-teal-500/20"
-                title="Lưu tên"
-              >
-                <Check className="w-3 h-3" />
-              </button>
-            </form>
-          ) : (
+        {/* 1. Tên & ID Tài Khoản (Bấm để sửa Tên & Tiền gốc, liên kết với Sidebar) */}
+        <div className="relative" ref={accountRef}>
+          <div className="flex items-center clay-well rounded-full px-3 py-1 text-xs">
             <button
               type="button"
-              onClick={() => {
-                setNameInput(activeAccount.name || '');
-                setIsEditingName(true);
-              }}
-              className="flex items-center gap-1.5 font-bold text-[var(--text-primary)] hover:text-teal-400 transition-colors cursor-pointer group"
-              title="Bấm để sửa tên hiển thị tài khoản"
+              onClick={() => setIsAccountEditOpen(!isAccountEditOpen)}
+              className="flex items-center gap-1.5 font-bold text-[#1d1b17] hover:text-[#424843] transition-colors cursor-pointer group"
+              title="Bấm để sửa Tên hiển thị, Tiền gốc ban đầu hoặc đổi tài khoản"
             >
-              <span className="truncate max-w-[140px] sm:max-w-[200px]">{activeAccount.name || `MT5 #${selectedAccountId}`}</span>
-              <Edit2 className="w-3 h-3 text-[var(--text-muted)] group-hover:text-teal-400 transition-colors shrink-0" />
+              <span className="truncate max-w-[140px] sm:max-w-[200px] text-[#1d1b17] font-bold">
+                {activeAccount.name || `MT5 #${selectedAccountId}`}
+              </span>
+              <Edit2 className="w-3 h-3 text-[#1d1b17]/70 group-hover:text-[#1d1b17] transition-colors shrink-0" />
             </button>
-          )}
-          <span className="mx-2 text-[var(--border-main)] font-light">|</span>
-          <span className="font-mono text-teal-500 dark:text-teal-400 font-bold text-[11px]">
-            #{selectedAccountId}
-          </span>
-        </div>
+            <span className="mx-2 text-[var(--border-main)] font-light">|</span>
+            <span className="font-mono text-[#1d1b17] font-bold text-[11px]">
+              #{selectedAccountId}
+            </span>
+          </div>
 
-        {/* 2. Nút Bánh Răng Cài Đặt (Tích hợp Gom Đồng Bộ + Supabase Live Status vào Popover) */}
-        <div className="relative" ref={settingsRef}>
-          <button
-            type="button"
-            onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-            className={`p-2 rounded-lg border transition-all cursor-pointer ${
-              isSettingsOpen || isSyncing
-                ? 'bg-teal-500/15 border-teal-500/40 text-teal-400'
-                : 'bg-[var(--bg-subtle)] border-[var(--border-main)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-            }`}
-            title="Cài đặt kết nối & Đồng bộ Supabase"
-          >
-            <SettingsIcon className={`w-4 h-4 ${isSyncing ? 'animate-spin text-teal-400' : ''}`} />
-          </button>
-
-          {/* Popover Bánh Răng */}
-          {isSettingsOpen && (
-            <div className="absolute left-0 top-full mt-2 w-72 bg-[var(--bg-card)] border border-[var(--border-main)] rounded-xl shadow-2xl p-3 z-50 text-xs flex flex-col gap-2.5">
+            {/* Popover Chỉnh Sửa Tài Khoản & Nhập Tiền Gốc */}
+          {isAccountEditOpen && (
+            <div className="absolute left-0 top-full mt-2 w-80 clay-card rounded-2xl shadow-2xl p-4 z-50 text-xs flex flex-col gap-3">
               <div className="flex items-center justify-between pb-2 border-b border-[var(--border-main)]">
-                <span className="font-bold text-[var(--text-primary)]">Cài Đặt & Kết Nối</span>
+                <span className="font-bold text-[var(--text-primary)]">
+                  {language === 'vi' ? 'Cài Đặt Tài Khoản & Tiền Gốc' : 'Account & Capital Settings'}
+                </span>
                 <button
                   type="button"
-                  onClick={() => setIsSettingsOpen(false)}
-                  className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                  onClick={() => setIsAccountEditOpen(false)}
+                  className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
 
+              {/* Chuyển nhanh tài khoản đã có (Đồng bộ với Sidebar) */}
+              {accounts && accounts.length > 0 && (
+                <div className="flex flex-col gap-1">
+                  <span className="text-[11px] font-semibold text-[var(--text-secondary)]">
+                    {language === 'vi' ? 'Chọn tài khoản giao dịch:' : 'Select trading account:'}
+                  </span>
+                  <select
+                    value={selectedAccountId}
+                    onChange={(e) => {
+                      onAccountIdChange(e.target.value);
+                      setIsAccountEditOpen(false);
+                    }}
+                    className="w-full bg-[var(--bg-input)] border border-[var(--border-main)] rounded-lg p-1.5 text-xs text-[var(--text-primary)] font-semibold focus:outline-none focus:border-teal-500 cursor-pointer"
+                  >
+                    {accounts.filter(acc => 
+                      acc && acc.id && 
+                      acc.id !== 'ALL' && 
+                      !String(acc.id).startsWith('mock-') && 
+                      !String(acc.name || '').toLowerCase().includes('tất cả tài khoản')
+                    ).map(acc => {
+                      const bal = (acc.id === selectedAccountId && activeAccount?.balance !== undefined)
+                        ? activeAccount.balance
+                        : (acc.balance ?? acc.initial_balance ?? 10000);
+                      return (
+                        <option key={acc.id} value={acc.id}>
+                          {acc.name} (#{acc.id}) - ${(bal ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              )}
+
+              {/* Form Sửa Tên & Tiền Gốc */}
+              <form onSubmit={handleAccountSubmit} className="flex flex-col gap-2.5">
+                <div>
+                  <label className="text-[11px] font-semibold text-[var(--text-secondary)] block mb-1">
+                    {language === 'vi' ? 'Tên hiển thị tài khoản:' : 'Account display name:'}
+                  </label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="Ví dụ: MT5 #26325348"
+                    className="w-full px-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-main)] rounded-lg text-xs text-[var(--text-primary)] font-semibold focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold text-[var(--text-secondary)] block mb-1">
+                    {language === 'vi' ? 'Tiền vốn ban đầu (Initial Balance):' : 'Initial Capital ($):'}
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] font-mono font-bold">$</span>
+                    <input
+                      type="number"
+                      step="any"
+                      value={editInitBalance}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEditInitBalance(val);
+                        const num = parseFloat(val);
+                        if (!isNaN(num) && num >= 0 && onUpdateAccount) {
+                          onUpdateAccount(selectedAccountId, { initial_balance: num });
+                        }
+                      }}
+                      placeholder="10000"
+                      className="w-full pl-6 pr-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-main)] rounded-lg text-xs text-[var(--text-primary)] font-mono font-bold focus:outline-none focus:border-[#1d1b17]"
+                    />
+                  </div>
+                  <div className="mt-2 p-2 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-main)] space-y-1 text-[11px]">
+                    <div className="flex justify-between text-[var(--text-secondary)]">
+                      <span>{language === 'vi' ? 'Lãi/Lỗ lũy kế (Net PnL):' : 'Net P&L:'}</span>
+                      <span className={`font-mono font-bold ${activeAccount.pnl >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                        {activeAccount.pnl >= 0 ? `+$${activeAccount.pnl.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : `-$${Math.abs(activeAccount.pnl).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                      </span>
+                    </div>
+                    <div className="flex justify-between font-bold text-[var(--text-primary)] border-t border-[var(--border-main)] pt-1">
+                      <span>{language === 'vi' ? 'Số dư hiện tại (Equity):' : 'Current Equity:'}</span>
+                      <span className="font-mono text-[#1d1b17] font-bold">
+                        ${((parseFloat(editInitBalance) || 0) + (activeAccount.pnl || 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-1.5">
+                    {language === 'vi' 
+                      ? 'Vốn và Equity ở hàng 1 cùng cột BALANCE tự động tính lũy kế theo số tiền vốn này.' 
+                      : 'Capital and Balance columns automatically calculate trajectory based on this value.'}
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-main)]">
+                  <button
+                    type="button"
+                    onClick={() => setIsAccountEditOpen(false)}
+                    className="px-2.5 py-1 rounded-lg text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)] cursor-pointer"
+                  >
+                    {language === 'vi' ? 'Hủy' : 'Cancel'}
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-3 py-1 rounded-lg bg-[#1d1b17] hover:bg-[#30363d] text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
+                  >
+                    {language === 'vi' ? 'Lưu & Cập nhật' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+        </div>
+
+        {/* 2. Bộ Lọc Lệnh Thông Minh (Đã chuyển xuống thanh Trading History của Bảng Lịch Sử) */}
+
+        {/* 4. Ô Tìm Kiếm (Search Bar - Chỉ hiển thị ở các tab khác nếu có, tab Lịch Sử đã đưa xuống thanh Trading History) */}
+        {currentTab !== 'lich-su' && (
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+            <input
+              type="text"
+              placeholder={language === 'vi' ? 'Tìm kiếm...' : 'Search...'}
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className="pl-8 pr-7 py-1.5 rounded-full clay-well text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-teal-500 w-36 sm:w-48 font-mono transition-colors"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => onSearchChange('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ========================================================
+          RIGHT: Thống Kê Số Dư MT5 + Theme Toggle + Nạp Import
+         ======================================================== */}
+      <div className="flex items-center gap-2.5">
+        {/* 5. Thống Kê Số Dư MT5 (Account Balance Strip): Chỉ xuất hiện duy nhất ở Tab Lịch Sử */}
+        {currentTab === 'lich-su' && (
+          <div className="hidden lg:flex items-center gap-2.5 px-3.5 py-1.5 rounded-full clay-well text-xs font-mono">
+            {/* Vốn (Tiền gốc ban đầu lấy trực tiếp từ cài đặt tài khoản MT5) */}
+            <div className="flex items-center gap-1 text-[var(--text-secondary)]">
+              <span className="font-sans font-medium text-[11px]">{language === 'vi' ? 'Vốn:' : 'Capital:'}</span>
+              <span className="font-bold text-[var(--text-primary)]">
+                ${(activeAccount.initial_balance ?? 10000).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+
+            <span className="text-[var(--border-main)]">|</span>
+
+            {/* Equity (Số dư hiện tại = Vốn + Lãi/Lỗ) */}
+            <div className="flex items-center gap-1 text-[var(--text-secondary)]">
+              <span className="font-sans font-medium text-[11px]">Equity:</span>
+              <span className="font-bold text-[var(--text-primary)]">
+                ${activeAccount.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+
+            <span className="text-[var(--border-main)]">|</span>
+
+            {/* PnL */}
+            <div className="flex items-center gap-1">
+              <span className="font-sans font-medium text-[11px] text-[var(--text-secondary)]">{language === 'vi' ? 'Lãi/Lỗ:' : 'PnL:'}</span>
+              <span className={`font-bold flex items-center ${isLoss ? 'text-rose-500 dark:text-rose-400' : 'text-emerald-500 dark:text-emerald-400'}`}>
+                {isLoss ? <TrendingDown className="w-3 h-3 mr-0.5" /> : <TrendingUp className="w-3 h-3 mr-0.5" />}
+                {activeAccount.pnl >= 0 ? `+$${activeAccount.pnl.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : `-$${Math.abs(activeAccount.pnl).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+              </span>
+            </div>
+
+            <span className="text-[var(--border-main)]">|</span>
+
+            {/* Winrate */}
+            <div className="flex items-center gap-1 text-[var(--text-secondary)]">
+              <span className="font-sans font-medium text-[11px]">Win:</span>
+              <span className="font-bold text-[#1d1b17]">
+                {activeAccount.win_rate}%
+              </span>
+              <span className="text-[10px] text-[var(--text-muted)]">
+                ({activeAccount.wins}W/{activeAccount.losses}L)
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Nút Đăng Nhập / Thông Tin Tài Khoản */}
+        {authUser ? (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl clay-card border border-[var(--border-main)] text-xs font-mono shrink-0">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-[var(--text-primary)] font-semibold max-w-[120px] truncate" title={authUser.email}>
+              {authUser.email?.split('@')[0] || 'User'}
+            </span>
+            <button
+              type="button"
+              onClick={onSignOut}
+              className="ml-1 text-[10px] text-rose-500 hover:text-rose-400 font-sans cursor-pointer hover:underline"
+              title={language === 'vi' ? 'Đăng xuất' : 'Sign out'}
+            >
+              {language === 'vi' ? 'Thoát' : 'Exit'}
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={onOpenAuth}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 text-teal-600 dark:text-teal-400 border border-teal-500/30 text-xs font-semibold transition-all cursor-pointer shrink-0"
+            title={language === 'vi' ? 'Đăng nhập / Đăng ký' : 'Sign In / Register'}
+          >
+            <User className="w-3.5 h-3.5" />
+            <span>{language === 'vi' ? 'Đăng nhập' : 'Sign In'}</span>
+          </button>
+        )}
+
+        {/* Nút Nạp Import */}
+        <button
+          type="button"
+          onClick={onOpenImport}
+          className="p-2 rounded-xl clay-btn-secondary text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all cursor-pointer shrink-0"
+          title={language === 'vi' ? 'Nạp Import CSV' : 'Import MT5 CSV'}
+        >
+          <Upload className="w-4 h-4" />
+        </button>
+
+        {/* Nút Bánh Răng Cài Đặt */}
+        <div className="relative shrink-0" ref={settingsRef}>
+          <button
+            type="button"
+            onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+            className={`p-2 rounded-xl transition-all cursor-pointer ${
+              isSettingsOpen || isSyncing
+                ? 'clay-pill text-[#1d1b17] font-bold'
+                : 'clay-btn-secondary text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+            title={language === 'vi' ? 'Cài đặt kết nối & Đồng bộ Supabase' : 'Connection Settings & Supabase Sync'}
+          >
+            <SettingsIcon className={`w-4 h-4 ${isSyncing ? 'animate-spin text-[#1d1b17]' : ''}`} />
+          </button>
+
+          {/* Popover Bánh Răng (Mở từ bên phải vào để không bị tràn màn hình) */}
+          {isSettingsOpen && (
+            <div className="absolute right-0 top-full mt-2 w-72 clay-card rounded-2xl shadow-2xl p-3.5 z-50 text-xs flex flex-col gap-2.5">
+              <div className="flex items-center justify-between pb-2 border-b border-[var(--border-main)]">
+                <span className="font-bold text-[var(--text-primary)]">
+                  {language === 'vi' ? 'Cài Đặt & Kết Nối' : 'Settings & Connection'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen(false)}
+                  className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Nút Chọn Ngôn Ngữ (Language Switcher) */}
+              <div className="flex items-center justify-between p-2 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-main)]">
+                <span className="text-[var(--text-secondary)] font-medium flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5 text-teal-400" />
+                  <span>{language === 'vi' ? 'Ngôn ngữ' : 'Language'}:</span>
+                </span>
+                <div className="flex items-center gap-1 bg-[var(--bg-card)] p-0.5 rounded-lg border border-[var(--border-main)]">
+                  <button
+                    type="button"
+                    onClick={() => setLanguage('en')}
+                    className={`px-2 py-0.5 rounded text-xs font-bold transition-all cursor-pointer ${
+                      language === 'en'
+                        ? 'bg-teal-500 text-slate-950 shadow-sm'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    🇬🇧 EN
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLanguage('vi')}
+                    className={`px-2 py-0.5 rounded text-xs font-bold transition-all cursor-pointer ${
+                      language === 'vi'
+                        ? 'bg-teal-500 text-slate-950 shadow-sm'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    🇻🇳 VI
+                  </button>
+                </div>
+              </div>
+
+              {/* Chỉnh số dòng hiển thị mỗi trang (5, 10, 20 dòng) */}
+              {currentTab === 'lich-su' && (
+                <div className="flex items-center justify-between p-2 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-main)]">
+                  <span className="text-[var(--text-secondary)] font-medium">
+                    {language === 'vi' ? 'Số dòng / trang:' : 'Rows / page:'}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {[5, 10, 20].map((size) => (
+                      <button
+                        key={size}
+                        type="button"
+                        onClick={() => onPageSizeChange?.(size)}
+                        className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
+                          pageSize === size
+                            ? 'bg-teal-500 text-slate-950 shadow-sm'
+                            : 'bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-main)]'
+                        }`}
+                      >
+                        {size}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Tình trạng Supabase Live */}
               <div className="flex items-center justify-between p-2 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-main)]">
-                <span className="text-[var(--text-secondary)]">Trạng thái Supabase:</span>
+                <span className="text-[var(--text-secondary)]">
+                  {language === 'vi' ? 'Trạng thái Supabase:' : 'Supabase Status:'}
+                </span>
                 <div className="flex items-center gap-1.5 font-bold">
                   <span className={`w-2 h-2 rounded-full ${
                     supabaseStatus === 'connected' ? 'bg-emerald-400 animate-pulse' : supabaseStatus === 'loading' ? 'bg-cyan-400 animate-ping' : 'bg-amber-400'
                   }`} />
                   <span className={supabaseStatus === 'connected' ? 'text-emerald-500 dark:text-emerald-400' : 'text-amber-500 dark:text-amber-400'}>
-                    {supabaseStatus === 'connected' ? 'Supabase Live' : supabaseStatus === 'loading' ? 'Đang kết nối...' : 'Chưa kết nối'}
+                    {supabaseStatus === 'connected' 
+                      ? 'Supabase Live' 
+                      : supabaseStatus === 'loading' 
+                        ? (language === 'vi' ? 'Đang kết nối...' : 'Connecting...') 
+                        : (language === 'vi' ? 'Chưa kết nối' : 'Not Connected')}
                   </span>
                 </div>
               </div>
@@ -248,14 +564,14 @@ export const Header: React.FC<HeaderProps> = ({
                   onSync();
                 }}
                 disabled={isSyncing}
-                className="w-full flex items-center justify-between p-2 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 text-teal-500 dark:text-teal-400 font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                className="w-full flex items-center justify-between p-2 rounded-lg bg-[var(--bg-subtle)] hover:bg-[var(--border-main)]/40 border border-[var(--border-main)] text-[var(--text-primary)] font-semibold transition-colors cursor-pointer disabled:opacity-50"
               >
                 <span className="flex items-center gap-2">
                   <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                  <span>Đồng bộ dữ liệu Supabase</span>
+                  <span>{language === 'vi' ? 'Đồng bộ dữ liệu Supabase' : 'Sync Supabase Data'}</span>
                 </span>
                 <span className="text-[10px] font-mono text-[var(--text-muted)]">
-                  {isSyncing ? 'Đang tải...' : lastSyncTime ? lastSyncTime : 'Ngay'}
+                  {isSyncing ? (language === 'vi' ? 'Đang tải...' : 'Syncing...') : lastSyncTime ? lastSyncTime : (language === 'vi' ? 'Ngay' : 'Now')}
                 </span>
               </button>
 
@@ -270,279 +586,15 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <span className="flex items-center gap-2">
                   <SlidersHorizontal className="w-3.5 h-3.5" />
-                  <span>Cài đặt hệ thống & Offset</span>
+                  <span>{language === 'vi' ? 'Cài đặt hệ thống & Offset' : 'System Settings & Offset'}</span>
                 </span>
-                <span className="text-[10px] font-mono text-teal-500 dark:text-teal-400">
+                <span className="text-[10px] font-mono text-[var(--text-primary)] font-bold">
                   Offset: {timezoneOffset >= 0 ? `+${timezoneOffset}h` : `${timezoneOffset}h`}
                 </span>
               </button>
             </div>
           )}
         </div>
-
-        {/* 3. Bộ Lọc Lệnh Thông Minh (Dropdown Filter) - Chỉ hiển thị khi ở Tab Lịch Sử */}
-        {currentTab === 'lich-su' && (
-          <div className="relative" ref={filterRef}>
-            <button
-              type="button"
-              onClick={() => setIsFilterOpen(!isFilterOpen)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
-                activeFiltersCount > 0 || isFilterOpen
-                  ? 'bg-teal-500/15 border-teal-500/40 text-teal-500 dark:text-teal-400'
-                  : 'bg-[var(--bg-subtle)] border-[var(--border-main)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-              title="Mở Bộ Lọc Lệnh Thông Minh"
-            >
-              <Filter className="w-3.5 h-3.5 text-teal-400" />
-              <span>Bộ lọc</span>
-              {activeFiltersCount > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full bg-teal-500 text-slate-950 font-mono text-[10px] font-bold">
-                  {activeFiltersCount}
-                </span>
-              )}
-              <ChevronDown className={`w-3 h-3 text-[var(--text-muted)] transition-transform ${isFilterOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {/* Popover Bộ Lọc */}
-            {isFilterOpen && (
-              <div className="absolute left-0 top-full mt-2 w-80 bg-[var(--bg-card)] border border-[var(--border-main)] rounded-xl shadow-2xl p-4 z-50 text-xs flex flex-col gap-3">
-                <div className="flex items-center justify-between pb-2 border-b border-[var(--border-main)]">
-                  <div className="flex items-center gap-1.5 font-bold text-[var(--text-primary)]">
-                    <Filter className="w-3.5 h-3.5 text-teal-400" />
-                    <span>Bộ Lọc Lệnh Thông Minh</span>
-                  </div>
-                  {activeFiltersCount > 0 && onResetFilters && (
-                    <button
-                      type="button"
-                      onClick={onResetFilters}
-                      className="text-[11px] text-teal-500 dark:text-teal-400 hover:underline font-semibold"
-                    >
-                      Đặt lại
-                    </button>
-                  )}
-                </div>
-
-                {/* 1. Lọc Cặp tiền */}
-                <div className="flex flex-col gap-1">
-                  <span className="text-[11px] font-semibold text-[var(--text-secondary)]">Cặp tiền:</span>
-                  <select
-                    value={selectedSymbol}
-                    onChange={(e) => onSymbolChange?.(e.target.value)}
-                    className="w-full bg-[var(--bg-input)] border border-[var(--border-main)] rounded-lg p-1.5 text-[var(--text-primary)] font-semibold focus:outline-none focus:border-teal-500 cursor-pointer"
-                  >
-                    <option value="ALL">Tất cả cặp tiền</option>
-                    {uniqueSymbols.map(sym => (
-                      <option key={sym} value={sym}>{sym}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* 2. Lọc Loại Lệnh & Phiên Giao Dịch */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[11px] font-semibold text-[var(--text-secondary)]">Loại lệnh:</span>
-                    <select
-                      value={selectedType}
-                      onChange={(e) => onTypeChange?.(e.target.value)}
-                      className="w-full bg-[var(--bg-input)] border border-[var(--border-main)] rounded-lg p-1.5 text-[var(--text-primary)] font-semibold focus:outline-none focus:border-teal-500 cursor-pointer"
-                    >
-                      <option value="ALL">Tất cả</option>
-                      <option value="BUY">BUY</option>
-                      <option value="SELL">SELL</option>
-                    </select>
-                  </div>
-
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[11px] font-semibold text-[var(--text-secondary)]">Phiên:</span>
-                    <select
-                      value={selectedSession}
-                      onChange={(e) => onSessionChange?.(e.target.value)}
-                      className="w-full bg-[var(--bg-input)] border border-[var(--border-main)] rounded-lg p-1.5 text-[var(--text-primary)] font-semibold focus:outline-none focus:border-teal-500 cursor-pointer"
-                    >
-                      <option value="ALL">Tất cả</option>
-                      <option value="Á">Á (Tokyo)</option>
-                      <option value="Âu">Âu (London)</option>
-                      <option value="Mỹ">Mỹ (New York)</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* 3. Lọc Kết Quả & Setup */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[11px] font-semibold text-[var(--text-secondary)]">Kết quả:</span>
-                    <select
-                      value={selectedResult}
-                      onChange={(e) => onResultChange?.(e.target.value)}
-                      className="w-full bg-[var(--bg-input)] border border-[var(--border-main)] rounded-lg p-1.5 text-[var(--text-primary)] font-semibold focus:outline-none focus:border-teal-500 cursor-pointer"
-                    >
-                      <option value="ALL">Tất cả</option>
-                      <option value="Win">Win</option>
-                      <option value="Loss">Loss</option>
-                      <option value="BE">Hòa (BE)</option>
-                    </select>
-                  </div>
-
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[11px] font-semibold text-[var(--text-secondary)]">Setup:</span>
-                    <select
-                      value={selectedSetup}
-                      onChange={(e) => onSetupChange?.(e.target.value)}
-                      className="w-full bg-[var(--bg-input)] border border-[var(--border-main)] rounded-lg p-1.5 text-[var(--text-primary)] font-semibold focus:outline-none focus:border-teal-500 cursor-pointer"
-                    >
-                      <option value="ALL">Tất cả</option>
-                      {setupTags.map(st => (
-                        <option key={st.id} value={st.label}>{st.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* 4. Lọc Lệnh Rác (Noise Trades: volume <= 0.01) */}
-                <div className="pt-2 border-t border-[var(--border-main)] flex items-center justify-between">
-                  <div>
-                    <span className="font-semibold text-[var(--text-primary)]">Lọc Rác (&le;0.01 lot)</span>
-                    <p className="text-[10px] text-[var(--text-muted)]">Loại khỏi Winrate, RR & PnL</p>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    {noiseFilterActive && onToggleHideNoiseRows && (
-                      <button
-                        type="button"
-                        onClick={onToggleHideNoiseRows}
-                        className={`px-2 py-1 rounded text-[10px] font-semibold flex items-center gap-1 border transition-colors cursor-pointer ${
-                          hideNoiseRows
-                            ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
-                            : 'bg-[var(--bg-subtle)] text-[var(--text-secondary)] border-[var(--border-main)]'
-                        }`}
-                        title={hideNoiseRows ? "Đang ẩn lệnh rác khỏi bảng. Nhấn để chuyển sang làm mờ." : "Đang làm mờ lệnh rác. Nhấn để ẩn."}
-                      >
-                        {hideNoiseRows ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                        <span>{hideNoiseRows ? 'Ẩn' : 'Mờ'}</span>
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={onToggleNoiseFilter}
-                      className={`px-2 py-1 rounded text-xs font-bold border transition-all cursor-pointer ${
-                        noiseFilterActive
-                          ? 'bg-teal-500 text-slate-950 border-teal-500'
-                          : 'bg-[var(--bg-subtle)] text-[var(--text-muted)] border-[var(--border-main)]'
-                      }`}
-                    >
-                      {noiseFilterActive ? 'BẬT' : 'TẮT'}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Đóng */}
-                <button
-                  type="button"
-                  onClick={() => setIsFilterOpen(false)}
-                  className="w-full mt-1 py-1.5 rounded-lg bg-[var(--bg-subtle)] hover:bg-[var(--border-main)] text-[var(--text-primary)] font-semibold transition-colors cursor-pointer text-center"
-                >
-                  Áp dụng & Đóng
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 4. Ô Tìm Kiếm (Search Bar - Giữ nguyên ô nhập từ khóa tìm kiếm symbol/ticket) */}
-        <div className="relative">
-          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-          <input
-            type="text"
-            placeholder="Tìm symbol / ticket..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-8 pr-7 py-1.5 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-main)] text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-teal-500 w-36 sm:w-48 font-mono transition-colors"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => onSearchChange('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ========================================================
-          RIGHT: Thống Kê Số Dư MT5 + Theme Toggle + Nạp Import
-         ======================================================== */}
-      <div className="flex items-center gap-3">
-        {/* 5. Thống Kê Số Dư MT5 (Account Balance Strip): Chỉ xuất hiện duy nhất ở Tab Lịch Sử */}
-        {currentTab === 'lich-su' && (
-          <div className="hidden lg:flex items-center gap-2 px-3 py-1 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-main)] text-xs font-mono">
-            {/* Balance */}
-            <div className="flex items-center gap-1 text-[var(--text-secondary)]">
-              <span className="font-sans font-medium text-[11px]">Số dư:</span>
-              <span className="font-bold text-[var(--text-primary)]">
-                ${activeAccount.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </div>
-
-            <span className="text-[var(--border-main)]">|</span>
-
-            {/* Equity */}
-            <div className="flex items-center gap-1 text-[var(--text-secondary)]">
-              <span className="font-sans font-medium text-[11px]">Equity:</span>
-              <span className="font-bold text-[var(--text-primary)]">
-                ${activeAccount.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </div>
-
-            <span className="text-[var(--border-main)]">|</span>
-
-            {/* PnL */}
-            <div className="flex items-center gap-1">
-              <span className="font-sans font-medium text-[11px] text-[var(--text-secondary)]">Lãi/Lỗ:</span>
-              <span className={`font-bold flex items-center ${isLoss ? 'text-rose-500 dark:text-rose-400' : 'text-emerald-500 dark:text-emerald-400'}`}>
-                {isLoss ? <TrendingDown className="w-3 h-3 mr-0.5" /> : <TrendingUp className="w-3 h-3 mr-0.5" />}
-                {activeAccount.pnl >= 0 ? `+$${activeAccount.pnl.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : `-$${Math.abs(activeAccount.pnl).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-              </span>
-            </div>
-
-            <span className="text-[var(--border-main)]">|</span>
-
-            {/* Winrate */}
-            <div className="flex items-center gap-1 text-[var(--text-secondary)]">
-              <span className="font-sans font-medium text-[11px]">Win:</span>
-              <span className="font-bold text-teal-500 dark:text-teal-400">
-                {activeAccount.win_rate}%
-              </span>
-              <span className="text-[10px] text-[var(--text-muted)]">
-                ({activeAccount.wins}W/{activeAccount.losses}L)
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Global Dark / Light Theme Toggle Switch */}
-        <button
-          type="button"
-          onClick={onToggleTheme}
-          className="p-2 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-main)] hover:border-teal-500/40 text-[var(--text-secondary)] hover:text-teal-500 dark:hover:text-teal-400 transition-all cursor-pointer"
-          title={isDarkMode ? "Chuyển sang Giao diện Sáng (Light Mode)" : "Chuyển sang Giao diện Tối (Dark Mode)"}
-        >
-          {isDarkMode ? (
-            <Sun className="w-4 h-4 text-amber-400" />
-          ) : (
-            <Moon className="w-4 h-4 text-slate-700" />
-          )}
-        </button>
-
-        {/* Nút Nạp Import */}
-        <button
-          type="button"
-          onClick={onOpenImport}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 text-slate-950 font-bold text-xs shadow-md shadow-teal-500/20 transition-all cursor-pointer active:scale-98 shrink-0"
-        >
-          <Upload className="w-3.5 h-3.5 stroke-[2.5]" />
-          <span>Nạp Import</span>
-        </button>
       </div>
     </header>
   );

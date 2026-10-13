@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Clock, 
@@ -23,6 +23,7 @@ import {
   cleanSupabaseKey 
 } from '../lib/supabase';
 import { saveTimezoneOffset, formatDateTimeWithOffset } from '../utils/tradeCalculations';
+import { useLanguage } from '../context/LanguageContext';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -47,18 +48,41 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onUpdatePostMistakes,
   onRefreshSupabase,
 }) => {
-  if (!isOpen) return null;
-
-  const currentCreds = getSupabaseCredentials();
+  const { t, language, setLanguage } = useLanguage();
   const [offsetHours, setOffsetHours] = useState<number>(settings.timezone_offset_hours);
   const [autoSession, setAutoSession] = useState<boolean>(settings.auto_classify_session);
-  const [activeTab, setActiveTab] = useState<'timezone' | 'checklist' | 'contract' | 'supabase'>('supabase');
+  const [activeTab, setActiveTab] = useState<'timezone' | 'checklist' | 'contract' | 'supabase' | 'language'>('supabase');
 
   // Supabase credentials state
-  const [supabaseUrl, setSupabaseUrl] = useState<string>(currentCreds.url);
-  const [supabaseKey, setSupabaseKey] = useState<string>(currentCreds.anonKey);
+  const [supabaseUrl, setSupabaseUrl] = useState<string>(() => getSupabaseCredentials().url);
+  const [supabaseKey, setSupabaseKey] = useState<string>(() => getSupabaseCredentials().anonKey);
   const [isTesting, setIsTesting] = useState<boolean>(false);
   const [testResult, setTestResult] = useState<{ success?: boolean; message?: string } | null>(null);
+
+  // Sync state whenever modal opens or settings change
+  useEffect(() => {
+    if (isOpen) {
+      const currentCreds = getSupabaseCredentials();
+      setSupabaseUrl(currentCreds.url);
+      setSupabaseKey(currentCreds.anonKey);
+      setOffsetHours(settings.timezone_offset_hours);
+      setAutoSession(settings.auto_classify_session);
+    }
+  }, [isOpen, settings]);
+
+  // Handle Escape key to close modal
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' || e.key === 'Esc') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
 
   const handleTestConnection = async () => {
     setIsTesting(true);
@@ -95,56 +119,60 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 select-none">
-      <div className="bg-[#0f141d] border border-slate-700 rounded-xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+      <div className="w-full max-w-2xl bg-[#161b22] border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Modal Header */}
-        <div className="px-5 py-3.5 bg-[#121824] border-b border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-blue-600/20 text-blue-400">
-              <SettingsIcon className="w-4 h-4" />
+        <div className="px-5 py-4 bg-[#121824] border-b border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center">
+              <SettingsIcon className="w-5 h-5 text-cyan-400" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-white">Cài Đặt Hệ Thống & Cấu Hình MT5</h3>
-              <p className="text-[11px] text-slate-400">Múi giờ Offset, phân loại Phiên Á/Âu/Mỹ, và Tiêu chí Kỷ luật</p>
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                <span>{language === 'vi' ? 'Cài Đặt Hệ Thống & Cấu Hình MT5' : 'System Settings & MT5 Configuration'}</span>
+              </h3>
+              <p className="text-[11px] text-slate-400">
+                {language === 'vi' ? 'Múi giờ Offset, phân loại Phiên Á/Âu/Mỹ, và Tiêu chí Kỷ luật' : 'Timezone Offset, Session Killzones, and Discipline Checklist'}
+              </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Sub-tabs inside Settings */}
-        <div className="px-5 pt-3 bg-[#0d1117] border-b border-slate-800 flex items-center gap-2 text-xs">
+        <div className="px-5 pt-3 bg-[#0d1117] border-b border-slate-800 flex items-center gap-2 text-xs overflow-x-auto">
           <button
             type="button"
             onClick={() => setActiveTab('timezone')}
-            className={`pb-2.5 px-2 font-semibold border-b-2 transition-colors ${
+            className={`pb-2.5 px-2 font-semibold border-b-2 transition-colors cursor-pointer shrink-0 ${
               activeTab === 'timezone'
                 ? 'border-cyan-400 text-cyan-300'
                 : 'border-transparent text-slate-400 hover:text-slate-300'
             }`}
           >
-            Múi Giờ Offset & Phiên
+            {language === 'vi' ? 'Múi Giờ Offset & Phiên' : 'Timezone Offset & Sessions'}
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('checklist')}
-            className={`pb-2.5 px-2 font-semibold border-b-2 transition-colors ${
+            className={`pb-2.5 px-2 font-semibold border-b-2 transition-colors cursor-pointer shrink-0 ${
               activeTab === 'checklist'
                 ? 'border-cyan-400 text-cyan-300'
                 : 'border-transparent text-slate-400 hover:text-slate-300'
             }`}
           >
-            Tiêu Chí Kỷ Luật (Checklist)
+            {language === 'vi' ? 'Tiêu Chí Kỷ Luật (Checklist)' : 'Discipline Checklist'}
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('contract')}
-            className={`pb-2.5 px-2 font-semibold border-b-2 transition-colors ${
+            className={`pb-2.5 px-2 font-semibold border-b-2 transition-colors cursor-pointer shrink-0 ${
               activeTab === 'contract'
                 ? 'border-cyan-400 text-cyan-300'
                 : 'border-transparent text-slate-400 hover:text-slate-300'
@@ -155,14 +183,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('supabase')}
-            className={`pb-2.5 px-2 font-semibold border-b-2 transition-colors flex items-center gap-1.5 ${
+            className={`pb-2.5 px-2 font-semibold border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 ${
               activeTab === 'supabase'
                 ? 'border-cyan-400 text-cyan-300'
                 : 'border-transparent text-slate-400 hover:text-slate-300'
             }`}
           >
             <Database className="w-3.5 h-3.5" />
-            <span>Kết Nối Supabase (MT5)</span>
+            <span>{language === 'vi' ? 'Kết Nối Supabase (MT5)' : 'Supabase Connection (MT5)'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('language')}
+            className={`pb-2.5 px-2 font-semibold border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 ${
+              activeTab === 'language'
+                ? 'border-cyan-400 text-cyan-300'
+                : 'border-transparent text-slate-400 hover:text-slate-300'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span>{language === 'vi' ? 'Ngôn Ngữ' : 'Language'}</span>
           </button>
         </div>
 
@@ -481,25 +521,85 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             </div>
           )}
+
+          {activeTab === 'language' && (
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-4">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-cyan-400" />
+                    <span>{language === 'vi' ? 'Lựa Chọn Ngôn Ngữ Hệ Thống' : 'Select Application Language'}</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    {language === 'vi' 
+                      ? 'Chuyển đổi giao diện song song giữa Tiếng Anh và Tiếng Việt. Thiết lập được lưu vĩnh viễn trên trình duyệt.' 
+                      : 'Seamlessly switch between English and Vietnamese. Your preference is persisted in browser storage.'}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setLanguage('en')}
+                    className={`p-4 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-2 ${
+                      language === 'en'
+                        ? 'bg-cyan-500/15 border-cyan-500/60 shadow-lg shadow-cyan-500/10'
+                        : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-2xl">🇬🇧</span>
+                      {language === 'en' && <CheckCircle2 className="w-4 h-4 text-cyan-400" />}
+                    </div>
+                    <div>
+                      <span className="font-bold text-slate-200 text-sm block">English</span>
+                      <span className="text-[11px] text-slate-400">International Standard (Mặc định)</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setLanguage('vi')}
+                    className={`p-4 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-2 ${
+                      language === 'vi'
+                        ? 'bg-cyan-500/15 border-cyan-500/60 shadow-lg shadow-cyan-500/10'
+                        : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-2xl">🇻🇳</span>
+                      {language === 'vi' && <CheckCircle2 className="w-4 h-4 text-cyan-400" />}
+                    </div>
+                    <div>
+                      <span className="font-bold text-slate-200 text-sm block">Tiếng Việt</span>
+                      <span className="text-[11px] text-slate-400">Giao diện Tiếng Việt chuẩn</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Modal Footer */}
         <div className="px-5 py-3 bg-[#121824] border-t border-slate-800 flex items-center justify-between">
-          <span className="text-[11px] text-slate-500">Thiết lập tự động đồng bộ hóa phiên giao dịch</span>
+          <span className="text-[11px] text-slate-500">
+            {language === 'vi' ? 'Thiết lập tự động đồng bộ hóa phiên giao dịch' : 'Settings automatically saved to browser'}
+          </span>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
             >
-              Đóng
+              {language === 'vi' ? 'Đóng' : 'Close'}
             </button>
             <button
               type="button"
               onClick={handleSave}
-              className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md shadow-blue-900/30"
+              className="px-4 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold shadow-md shadow-teal-900/30 cursor-pointer"
             >
-              Lưu Cấu Hình
+              {language === 'vi' ? 'Lưu Cấu Hình' : 'Save Settings'}
             </button>
           </div>
         </div>

@@ -44,8 +44,10 @@ export interface TradeRow {
   // MFE & MAE Data (Thu thập từ High / Low của EA và tính toán chuẩn xác)
   high?: number | null; // Mức giá cao nhất sau Entry
   low?: number | null; // Mức giá thấp nhất sau Entry
-  mfe_price?: number | null; // Maximum Favorable Excursion theo giá
-  mae_price?: number | null; // Maximum Adverse Excursion theo giá
+  mfe_price?: number | null; // Mức giá thị trường lúc đạt đỉnh MFE
+  mae_price?: number | null; // Mức giá thị trường lúc chịu đáy MAE
+  mfe_dist?: number | null; // Khoảng cách giá chênh lệch MFE (|open - mfe_price|)
+  mae_dist?: number | null; // Khoảng cách giá chênh lệch MAE (|open - mae_price|)
   mfe_r?: number | null; // MFE quy đổi theo R (nếu có Initial SL)
   mae_r?: number | null; // MAE quy đổi theo R (nếu có Initial SL)
 
@@ -62,6 +64,7 @@ export interface TradeRow {
   pnl_percentage?: number;
   running_balance?: number;
   is_noise?: boolean; // Lệnh rác (Volume <= 0.01 lot)
+  candles?: any; // Chuỗi nến M5 từ MT5/Supabase lưu trữ cho lệnh
 }
 
 export interface TradeGroup {
@@ -81,6 +84,7 @@ export interface TradeGroup {
   total_commission?: number; // Tổng phí commission của các deal
   total_swap?: number; // Tổng swap của các deal
   total_gross_pnl?: number; // Tổng PnL gộp
+  total_risk_1r?: number; // Tổng rủi ro 1R của các deal con
   weighted_rr: number;
   pnl_percentage: number;
   result: TradeResult;
@@ -149,6 +153,7 @@ export interface TradingPlan {
   setup?: string; // Tên Setup
   notes?: string; // Ghi chú phân tích
   checklist?: string[]; // Danh sách ID tiêu chí kỷ luật
+  post_checklist?: string[]; // Danh sách ID lỗi tâm lý
   image_url?: string; // Ảnh Pre-trade từ clipboard paste Ctrl+V hoặc file
   status: 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'READY' | 'TRIGGERED' | 'EXPIRED';
   created_at: string;

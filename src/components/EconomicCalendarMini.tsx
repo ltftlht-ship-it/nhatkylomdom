@@ -1,0 +1,579 @@
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { RotateCw, Check, X } from 'lucide-react';
+
+export interface MiniCalendarEvent {
+  title: string;
+  country: string;
+  date: string;
+  impact: 'High' | 'Medium' | 'Low' | 'Holiday' | string;
+  forecast: string;
+  previous: string;
+}
+
+// Danh sách các đồng tiền & symbol phổ biến tương ứng
+const CURRENCIES_CONFIG = [
+  { code: 'USD', name: 'Đô la Mỹ (USD)' },
+  { code: 'EUR', name: 'Euro (EUR)' },
+  { code: 'GBP', name: 'Bảng Anh (GBP)' },
+  { code: 'JPY', name: 'Yên Nhật (JPY)' },
+  { code: 'AUD', name: 'Đô la Úc (AUD)' },
+  { code: 'CAD', name: 'Đô la Canada (CAD)' },
+  { code: 'CHF', name: 'Franc Thụy Sĩ (CHF)' },
+  { code: 'NZD', name: 'Đô la New Zealand (NZD)' },
+  { code: 'CNY', name: 'Nhân dân tệ (CNY)' },
+];
+
+export const EconomicCalendarMini: React.FC = () => {
+  const [events, setEvents] = useState<MiniCalendarEvent[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // MẶC ĐỊNH AUTO HIỆN CẢ TUẦN
+  const [timeFilter, setTimeFilter] = useState<'WEEK' | 'TODAY'>(() => {
+    return (localStorage.getItem('deal_calendar_time_filter') as 'WEEK' | 'TODAY') || 'WEEK';
+  });
+
+  // TÙY CHỌN NHIỀU KIỂU TIN (MULTI-SELECT: RED, ORANGE, GRAY)
+  const [selectedImpacts, setSelectedImpacts] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('deal_calendar_impacts_multi_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // fallback
+    }
+    return ['RED'];
+  });
+
+  // TÙY CHỌN DANH SÁCH ĐỒNG TIỀN / SYMBOL (Lưu LocalStorage)
+  const [selectedCurrencies, setSelectedCurrencies] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('deal_calendar_currencies');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // fallback
+    }
+    return ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'NZD'];
+  });
+
+  // State mở popover modal Settings
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const settingsModalRef = useRef<HTMLDivElement | null>(null);
+
+  // Đóng modal khi click ra ngoài
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (settingsModalRef.current && !settingsModalRef.current.contains(e.target as Node)) {
+        setIsSettingsOpen(false);
+      }
+    };
+    if (isSettingsOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isSettingsOpen]);
+
+  const handleToggleImpact = (impactKey: string) => {
+    setSelectedImpacts((prev) => {
+      let next: string[];
+      if (impactKey === 'ALL') {
+        next = ['RED', 'ORANGE', 'GRAY'];
+      } else {
+        if (prev.includes(impactKey)) {
+          next = prev.filter((k) => k !== impactKey);
+        } else {
+          next = [...prev, impactKey];
+        }
+      }
+      localStorage.setItem('deal_calendar_impacts_multi_v1', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const handleToggleTimeFilter = (val: 'WEEK' | 'TODAY') => {
+    setTimeFilter(val);
+    localStorage.setItem('deal_calendar_time_filter', val);
+  };
+
+  const handleToggleCurrency = (code: string) => {
+    setSelectedCurrencies((prev) => {
+      let next: string[];
+      if (prev.includes(code)) {
+        next = prev.filter((c) => c !== code);
+      } else {
+        next = [...prev, code];
+      }
+      localStorage.setItem('deal_calendar_currencies', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const handleSelectAllCurrencies = () => {
+    const all = CURRENCIES_CONFIG.map((c) => c.code);
+    setSelectedCurrencies(all);
+    localStorage.setItem('deal_calendar_currencies', JSON.stringify(all));
+  };
+
+  const handleDeselectAllCurrencies = () => {
+    setSelectedCurrencies([]);
+    localStorage.setItem('deal_calendar_currencies', JSON.stringify([]));
+  };
+
+  const fetchCalendar = async () => {
+    setIsLoading(true);
+    try {
+      let res: Response | null = null;
+      try {
+        res = await fetch('/api/forexfactory/ff_calendar_thisweek.json');
+      } catch {
+        res = null;
+      }
+
+      if (!res || !res.ok) {
+        try {
+          res = await fetch(
+            'https://api.allorigins.win/raw?url=' +
+              encodeURIComponent('https://nfs.faireconomy.media/ff_calendar_thisweek.json')
+          );
+        } catch {
+          res = null;
+        }
+      }
+
+      if (!res || !res.ok) {
+        res = await fetch('https://nfs.faireconomy.media/ff_calendar_thisweek.json');
+      }
+
+      if (res && res.ok) {
+        const data: MiniCalendarEvent[] = await res.json();
+        setEvents(data || []);
+      }
+    } catch (err) {
+      console.warn('Lỗi tải lịch kinh tế:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCalendar();
+    const timer = setInterval(fetchCalendar, 15 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatVNDate = (isoDateStr: string) => {
+    try {
+      const d = new Date(isoDateStr);
+      if (isNaN(d.getTime())) return { dateStr: isoDateStr, timeStr: '', dayOfWeek: '' };
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const day = pad(d.getDate());
+      const month = pad(d.getMonth() + 1);
+      const hours = pad(d.getHours());
+      const mins = pad(d.getMinutes());
+      const days = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+      const dayOfWeek = days[d.getDay()] || '';
+      return {
+        dateStr: `${dayOfWeek} ${day}/${month}`,
+        timeStr: `${hours}:${mins}`,
+        dayOfWeek,
+      };
+    } catch {
+      return { dateStr: isoDateStr, timeStr: '', dayOfWeek: '' };
+    }
+  };
+
+  const getMinutesUntil = (isoDateStr: string) => {
+    try {
+      return Math.round((new Date(isoDateStr).getTime() - Date.now()) / 60000);
+    } catch {
+      return 99999;
+    }
+  };
+
+  const isHolidayEvent = (ev: MiniCalendarEvent) => {
+    return ev.impact === 'Holiday' || (ev.title && ev.title.toLowerCase().includes('holiday'));
+  };
+
+  const filteredEvents = useMemo(() => {
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    return events.filter((ev) => {
+      // 1. Lọc theo Mức độ Impact (Hỗ trợ multi-select: RED, ORANGE, GRAY)
+      if (selectedImpacts.length === 0) return false;
+
+      const isRed = ev.impact === 'High';
+      const isOrange = ev.impact === 'Medium';
+      const isGray = isHolidayEvent(ev);
+
+      let matchesImpact = false;
+      if (selectedImpacts.includes('RED') && isRed) matchesImpact = true;
+      if (selectedImpacts.includes('ORANGE') && isOrange) matchesImpact = true;
+      if (selectedImpacts.includes('GRAY') && isGray) matchesImpact = true;
+
+      if (!matchesImpact) return false;
+
+      // 2. Lọc theo Đồng tiền / Symbol
+      if (selectedCurrencies.length > 0) {
+        const cur = (ev.country || '').trim().toUpperCase();
+        if (cur !== 'ALL' && !selectedCurrencies.includes(cur)) return false;
+      } else {
+        return false;
+      }
+
+      // 3. Lọc theo Thời gian (Hôm nay hay Cả tuần)
+      if (timeFilter === 'TODAY') {
+        try {
+          const evDate = new Date(ev.date);
+          const evDateStr = `${evDate.getFullYear()}-${String(evDate.getMonth() + 1).padStart(2, '0')}-${String(evDate.getDate()).padStart(2, '0')}`;
+          if (evDateStr !== todayStr) return false;
+        } catch {
+          // pass
+        }
+      }
+      return true;
+    });
+  }, [events, selectedImpacts, timeFilter, selectedCurrencies]);
+
+  return (
+    <div className="w-full rounded-2xl border border-[var(--border-main)] clay-card shadow-sm transition-all font-sans bg-[var(--bg-card)]">
+      {/* HEADER BẢNG TIN TỨC: BO TRÒN ĐỒNG BỘ 4 GÓC */}
+      <div className="px-3 py-2 bg-[var(--bg-card)] border-b border-[var(--border-main)] rounded-t-2xl flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5">
+          {/* LỊCH KINH TẾ MÀU ĐEN CHUẨN TERMINAL */}
+          <span className="font-bold text-[#1d1b17] text-xs uppercase tracking-wider">
+            LỊCH KINH TẾ
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1.5 relative z-30">
+          {/* BỘ NÚT TÙY CHỌN & TẢI LẠI THEO CHUẨN CLAY-PILL */}
+          <div className="flex items-center clay-well p-0.5 rounded-full border border-[var(--border-main)]/50">
+            <button
+              type="button"
+              onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+              className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${
+                isSettingsOpen
+                  ? 'clay-pill text-[#1d1b17] font-bold bg-white'
+                  : 'text-[var(--text-muted)] hover:text-[#1d1b17]'
+              }`}
+            >
+              Tùy Chọn
+            </button>
+            <button
+              type="button"
+              onClick={fetchCalendar}
+              disabled={isLoading}
+              className="p-1 rounded-full text-[var(--text-muted)] hover:text-[#1d1b17] hover:bg-white/80 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center"
+              title="Tải lại lịch kinh tế"
+            >
+              <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+
+          {/* POPOVER SETTINGS MODAL: NỔI LÊN TRÊN (z-50, shadow-2xl), KHÔNG BỊ KHUNG LÀM VIỆC CHE */}
+          {isSettingsOpen && (
+            <div
+              ref={settingsModalRef}
+              className="absolute right-0 top-full mt-2 w-[320px] sm:w-[350px] bg-white border border-[var(--border-main)] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.18)] z-50 p-3 space-y-3 animate-in fade-in zoom-in-95 duration-150 text-[#1d1b17]"
+            >
+              {/* Header popover */}
+              <div className="flex items-center justify-between pb-1.5 border-b border-[var(--border-main)]">
+                <span className="text-xs font-bold uppercase tracking-wider text-[#1d1b17]">
+                  CÀI ĐẶT BỘ LỌC TIN TỨC
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen(false)}
+                  className="p-1 rounded-lg hover:bg-[var(--bg-subtle)] text-[#1d1b17] transition-colors cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* 1. Tùy chọn Mức độ tin: HỖ TRỢ TICK NHIỀU KIỂU TIN (ĐỎ, CAM, XÁM) */}
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold text-[#1d1b17] uppercase tracking-wider block">
+                  1. Mức Độ Tác Động (Chọn nhiều)
+                </span>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleImpact('RED')}
+                    className={`flex items-center justify-between p-1.5 rounded-xl border text-xs font-semibold cursor-pointer transition-all ${
+                      selectedImpacts.includes('RED')
+                        ? 'border-[#1d1b17] bg-[var(--bg-subtle)] text-[#1d1b17] shadow-xs'
+                        : 'border-[var(--border-main)] bg-white text-[#1d1b17] hover:bg-[var(--bg-subtle)]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <div className={`w-3.5 h-3.5 rounded-[3.5px] border flex items-center justify-center shrink-0 bg-white ${
+                        selectedImpacts.includes('RED') ? 'border-[#1d1b17]' : 'border-[var(--border-main)]'
+                      }`}>
+                        {selectedImpacts.includes('RED') && <Check className="w-2.5 h-2.5 text-[#1d1b17] stroke-[3]" />}
+                      </div>
+                      <span>Tin Đỏ</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleToggleImpact('ORANGE')}
+                    className={`flex items-center justify-between p-1.5 rounded-xl border text-xs font-semibold cursor-pointer transition-all ${
+                      selectedImpacts.includes('ORANGE')
+                        ? 'border-[#1d1b17] bg-[var(--bg-subtle)] text-[#1d1b17] shadow-xs'
+                        : 'border-[var(--border-main)] bg-white text-[#1d1b17] hover:bg-[var(--bg-subtle)]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <div className={`w-3.5 h-3.5 rounded-[3.5px] border flex items-center justify-center shrink-0 bg-white ${
+                        selectedImpacts.includes('ORANGE') ? 'border-[#1d1b17]' : 'border-[var(--border-main)]'
+                      }`}>
+                        {selectedImpacts.includes('ORANGE') && <Check className="w-2.5 h-2.5 text-[#1d1b17] stroke-[3]" />}
+                      </div>
+                      <span>Tin Cam</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleToggleImpact('GRAY')}
+                    className={`flex items-center justify-between p-1.5 rounded-xl border text-xs font-semibold cursor-pointer transition-all ${
+                      selectedImpacts.includes('GRAY')
+                        ? 'border-[#1d1b17] bg-[var(--bg-subtle)] text-[#1d1b17] shadow-xs'
+                        : 'border-[var(--border-main)] bg-white text-[#1d1b17] hover:bg-[var(--bg-subtle)]'
+                    }`}
+                    title="Chỉ hiển thị ngày nghỉ lễ ngân hàng (Bank Holiday)"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <div className={`w-3.5 h-3.5 rounded-[3.5px] border flex items-center justify-center shrink-0 bg-white ${
+                        selectedImpacts.includes('GRAY') ? 'border-[#1d1b17]' : 'border-[var(--border-main)]'
+                      }`}>
+                        {selectedImpacts.includes('GRAY') && <Check className="w-2.5 h-2.5 text-[#1d1b17] stroke-[3]" />}
+                      </div>
+                      <span>Tin Xám (Nghỉ Lễ)</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleToggleImpact('ALL')}
+                    className="flex items-center justify-center p-1.5 rounded-xl border border-[var(--border-main)] bg-white text-[#1d1b17] hover:bg-[var(--bg-subtle)] text-xs font-semibold cursor-pointer transition-all"
+                  >
+                    <span>Chọn Tất Cả</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 2. Tùy chọn Khung thời gian: Cả Tuần vs Hôm Nay */}
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold text-[#1d1b17] uppercase tracking-wider block">
+                  2. Khung Thời Gian
+                </span>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleTimeFilter('WEEK')}
+                    className={`flex items-center justify-between p-1.5 rounded-xl border text-xs font-semibold cursor-pointer transition-all ${
+                      timeFilter === 'WEEK'
+                        ? 'border-[#1d1b17] bg-[var(--bg-subtle)] text-[#1d1b17] shadow-xs'
+                        : 'border-[var(--border-main)] bg-white text-[#1d1b17] hover:bg-[var(--bg-subtle)]'
+                    }`}
+                  >
+                    <span>Cả Tuần</span>
+                    {timeFilter === 'WEEK' && (
+                      <Check className="w-3 h-3 text-[#1d1b17] stroke-[3]" />
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleToggleTimeFilter('TODAY')}
+                    className={`flex items-center justify-between p-1.5 rounded-xl border text-xs font-semibold cursor-pointer transition-all ${
+                      timeFilter === 'TODAY'
+                        ? 'border-[#1d1b17] bg-[var(--bg-subtle)] text-[#1d1b17] shadow-xs'
+                        : 'border-[var(--border-main)] bg-white text-[#1d1b17] hover:bg-[var(--bg-subtle)]'
+                    }`}
+                  >
+                    <span>Hôm Nay</span>
+                    {timeFilter === 'TODAY' && (
+                      <Check className="w-3 h-3 text-[#1d1b17] stroke-[3]" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* 3. Tùy chọn Đồng tiền */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-[#1d1b17] uppercase tracking-wider">
+                    3. Lọc Đồng Tiền ({selectedCurrencies.length}/{CURRENCIES_CONFIG.length})
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={handleSelectAllCurrencies}
+                      className="text-[10px] text-[#1d1b17] hover:underline font-semibold cursor-pointer"
+                    >
+                      Chọn hết
+                    </button>
+                    <span className="text-[10px] text-[#1d1b17]">·</span>
+                    <button
+                      type="button"
+                      onClick={handleDeselectAllCurrencies}
+                      className="text-[10px] text-[#1d1b17] hover:underline font-semibold cursor-pointer"
+                    >
+                      Bỏ chọn
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-1 max-h-36 overflow-y-auto p-1 bg-[var(--bg-subtle)]/50 rounded-xl border border-[var(--border-main)]">
+                  {CURRENCIES_CONFIG.map((c) => {
+                    const isChecked = selectedCurrencies.includes(c.code);
+                    return (
+                      <button
+                        key={c.code}
+                        type="button"
+                        onClick={() => handleToggleCurrency(c.code)}
+                        className={`flex items-center gap-1.5 p-1 rounded-lg border text-xs cursor-pointer select-none transition-all text-left ${
+                          isChecked
+                            ? 'bg-white border-[#1d1b17] text-[#1d1b17] font-bold shadow-xs'
+                            : 'bg-transparent border-transparent text-[#1d1b17] hover:bg-white/60 font-normal'
+                        }`}
+                      >
+                        <div
+                          className={`w-3.5 h-3.5 rounded-[3.5px] border flex items-center justify-center shrink-0 transition-colors bg-white ${
+                            isChecked ? 'border-[#1d1b17]' : 'border-[var(--border-main)]'
+                          }`}
+                        >
+                          {isChecked && <Check className="w-2.5 h-2.5 text-[#1d1b17] stroke-[3]" />}
+                        </div>
+                        <span className="font-mono text-[11px] text-[#1d1b17]">{c.code}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Nút đóng */}
+              <div className="pt-1 border-t border-[var(--border-main)] flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen(false)}
+                  className="px-3.5 py-1 rounded-xl bg-[#1d1b17] text-white hover:bg-[#2b2721] text-xs font-bold transition-all cursor-pointer shadow-xs"
+                >
+                  Áp Dụng
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* DANH SÁCH BẢNG TIN TỨC: CỐ ĐỊNH CHUẨN XÁC 3 TIN, KHÔNG BỊ CẮT LỬNG LƠ TIN THỨ 4 */}
+      <div className="h-[164px] max-h-[164px] overflow-y-auto overflow-x-hidden p-0 rounded-b-2xl">
+        <table className="w-full table-fixed border-collapse text-left text-xs font-sans">
+          {/* HEADER MENU: TÔ CHỮ MÀU XÁM [var(--text-muted)], KHÔNG NỀN (transparent) GIỐNG BẢNG LỊCH SỬ */}
+          <thead>
+            <tr className="h-[32px] border-b border-[var(--border-main)] text-[10px] font-mono font-medium text-[var(--text-muted)] uppercase select-none sticky top-0 z-10 bg-white">
+              <th className="py-1.5 pl-3 pr-1 w-[28%] font-medium">Thời Gian</th>
+              <th className="py-1.5 px-1 w-[18%] text-center font-medium">Đồng</th>
+              <th className="py-1.5 px-2 w-[34%] font-medium">Sự Kiện</th>
+              <th className="py-1.5 pr-3 pl-1 w-[20%] text-right font-medium">Đếm Ngược</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--border-subtle)]/70 text-xs">
+            {isLoading && (
+              <tr className="h-[132px]">
+                <td colSpan={4} className="py-4 text-center text-[#1d1b17] text-xs font-mono">
+                  Đang tải dữ liệu lịch kinh tế...
+                </td>
+              </tr>
+            )}
+
+            {!isLoading && filteredEvents.length === 0 && (
+              <tr className="h-[132px]">
+                <td colSpan={4} className="py-4 text-center text-[#1d1b17] text-xs">
+                  Không có tin tức nào phù hợp bộ lọc.
+                </td>
+              </tr>
+            )}
+
+            {!isLoading &&
+              filteredEvents.map((ev, idx) => {
+                const { dateStr, timeStr } = formatVNDate(ev.date);
+                const mins = getMinutesUntil(ev.date);
+                const isPast = mins < -30;
+                const isHoliday = isHolidayEvent(ev);
+
+                // Xác định viền màu theo mức độ tác động của tin
+                let currencyBorderClass = 'border-gray-400 border text-[#1d1b17] bg-gray-50/20';
+                if (ev.impact === 'High') {
+                  currencyBorderClass = 'border-rose-500 border text-[#1d1b17] bg-rose-50/20';
+                } else if (ev.impact === 'Medium') {
+                  currencyBorderClass = 'border-amber-500 border text-[#1d1b17] bg-amber-50/20';
+                } else if (isHoliday) {
+                  currencyBorderClass = 'border-gray-400 border text-[#1d1b17] bg-gray-50/20';
+                }
+
+                return (
+                  <tr
+                    key={`${ev.date}-${ev.country}-${ev.title}-${idx}`}
+                    className={`h-[44px] transition-colors select-none ${
+                      isPast
+                        ? 'opacity-60 hover:opacity-100 hover:bg-[var(--bg-subtle)]/40 hover:text-emerald-700'
+                        : 'hover:bg-[var(--bg-subtle)]/40 hover:text-emerald-700'
+                    }`}
+                  >
+                    {/* THỜI GIAN: THỨ NGÀY Ở TRÊN, GIỜ PHÚT Ở DƯỚI */}
+                    <td className="py-1 pl-3 pr-1 font-mono text-[11px] whitespace-nowrap">
+                      <div className="flex flex-col leading-tight">
+                        <span className="text-[10px] text-[#1d1b17] font-semibold">{dateStr}</span>
+                        <span className="font-bold text-[#1d1b17] text-[11px]">{isHoliday ? 'Cả ngày' : timeStr}</span>
+                      </div>
+                    </td>
+
+                    {/* ĐỒNG: CHỮ MÀU ĐEN, VIỀN THEO MỨC ĐỘ TIN (ĐỎ, CAM, XÁM) */}
+                    <td className="py-1 px-1 text-center whitespace-nowrap">
+                      <span className={`px-1.5 py-0.2 rounded font-mono font-bold text-[11px] inline-block text-center min-w-[38px] ${currencyBorderClass}`}>
+                        {ev.country}
+                      </span>
+                    </td>
+
+                    {/* SỰ KIỆN: TRUNCATE KHÔNG LÀM VỠ KHUNG */}
+                    <td className="py-1 px-2 font-medium text-[#1d1b17] text-xs truncate">
+                      {ev.title}
+                    </td>
+
+                    {/* ĐẾM NGƯỢC */}
+                    <td className="py-1 pr-3 pl-1 text-right font-mono text-[11px] text-[#1d1b17] whitespace-nowrap">
+                      {isHoliday ? (
+                        <span className="text-[#1d1b17]">Nghỉ lễ</span>
+                      ) : isPast ? (
+                        <span>Đã ra</span>
+                      ) : mins >= 0 && mins <= 60 ? (
+                        <span className="font-bold border border-rose-500 px-1 py-0.2 rounded text-[10px]">
+                          Còn {mins}p
+                        </span>
+                      ) : mins > 60 && mins < 1440 ? (
+                        <span className="font-semibold">
+                          {Math.floor(mins / 60)}h{mins % 60}p
+                        </span>
+                      ) : (
+                        <span>Chưa ra</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};

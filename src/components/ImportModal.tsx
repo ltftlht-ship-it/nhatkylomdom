@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Upload, 
@@ -25,8 +25,6 @@ export const ImportModal: React.FC<ImportModalProps> = ({
   onImportTrades,
   onResetDemoData,
 }) => {
-  if (!isOpen) return null;
-
   const [importMode, setImportMode] = useState<'paste' | 'manual'>('paste');
   const [pastedJson, setPastedJson] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string>('');
@@ -40,6 +38,20 @@ export const ImportModal: React.FC<ImportModalProps> = ({
   const [closePrice, setClosePrice] = useState('4545.00');
   const [initialSl, setInitialSl] = useState('4505.00');
   const [pnl, setPnl] = useState('750.00');
+
+  // Handle Escape key to close modal
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' || e.key === 'Esc') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
 
   const handleProcessPastedData = () => {
     setErrorMsg('');

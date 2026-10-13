@@ -122,3 +122,108 @@ export async function uploadImageToSupabaseStorage(
     return null;
   }
 }
+
+/**
+ * Chuẩn hóa chuỗi ảnh: nếu chuỗi là raw base64 (chưa có data:image/...;base64,) thì tự động gắn prefix
+ */
+export function normalizeImageSource(img?: string | null): string {
+  if (!img) return '';
+  const trimmed = String(img).trim();
+  if (!trimmed) return '';
+  if (
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('data:image/') ||
+    trimmed.startsWith('data:application/') ||
+    trimmed.startsWith('blob:')
+  ) {
+    return trimmed;
+  }
+  // Nếu là chuỗi base64 raw (bắt đầu bằng iVBORw0KGgo hoặc ký tự base64)
+  if (/^[A-Za-z0-9+/=]+$/.test(trimmed.slice(0, 50))) {
+    return `data:image/png;base64,${trimmed}`;
+  }
+  return trimmed;
+}
+
+/**
+ * Chụp màn hình (Screen/Tab Capture) trực tiếp từ trình duyệt:
+ * Người dùng xác nhận chia sẻ Tab hiện tại, hệ thống lập tức bắt 1 khung hình biểu đồ sắc nét và chuyển thành DataURL.
+ */
+export async function captureScreenFrame(): Promise<string | null> {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+    throw new Error('Trình duyệt hiện tại không hỗ trợ API chụp màn hình trực tiếp.');
+  }
+
+  const stream = await navigator.mediaDevices.getDisplayMedia({
+    video: {
+      displaySurface: 'browser',
+    },
+    audio: false,
+  });
+
+  try {
+    const track = stream.getVideoTracks()[0];
+    const video = document.createElement('video');
+    video.srcObject = stream;
+    video.muted = true;
+    await video.play();
+
+    // Chờ 150ms để render chuẩn xác frame
+    await new Promise((r) => setTimeout(r, 150));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 1920;
+    canvas.height = video.videoHeight || 1080;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('Không thể khởi tạo Canvas chụp ảnh');
+    }
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    // Tắt stream ngay sau khi chụp
+    track.stop();
+    stream.getTracks().forEach((t) => t.stop());
+
+    return canvas.toDataURL('image/webp', 0.85);
+  } catch (err) {
+    stream.getTracks().forEach((t) => t.stop());
+    throw err;
+  }
+}
+
+/**
+ * Đọc ảnh hoặc URL ảnh trực tiếp từ bộ nhớ tạm (Clipboard):
+ * Rất tiện khi người dùng vừa bấm Máy ảnh TradingView hoặc Alt + S -> Sao chép ảnh.
+ */
+export async function readImageFromClipboard(): Promise<string | null> {
+  if (!navigator.clipboard) return null;
+  try {
+    // 1. Thử đọc dạng ảnh Blob
+    if (navigator.clipboard.read) {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        for (const type of item.types) {
+          if (type.startsWith('image/')) {
+            const blob = await item.getType(type);
+            const { dataUrl } = await compressImage(blob, 1600, 0.8);
+            return dataUrl;
+          }
+        }
+      }
+    }
+    // 2. Thử đọc dạng text nếu là link ảnh TradingView
+    if (navigator.clipboard.readText) {
+      const text = await navigator.clipboard.readText();
+      const clean = text?.trim();
+      if (clean && (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:image/'))) {
+        return clean;
+      }
+    }
+  } catch (err) {
+    console.warn('Không thể đọc tự động từ Clipboard:', err);
+  }
+  return null;
+}
+
