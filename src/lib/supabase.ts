@@ -306,10 +306,13 @@ export async function signUpWithEmailPassword(email: string, password: string) {
 export async function signInWithOAuthProvider(provider: 'google' | 'github') {
   const client = getSupabaseClient();
   if (!client) throw new Error('Chưa kết nối Supabase');
+  const redirectTarget = typeof window !== 'undefined' && window.location.origin.includes('vercel.app')
+    ? window.location.origin
+    : 'https://nhatkylomdom.vercel.app';
   return await client.auth.signInWithOAuth({
     provider,
     options: {
-      redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined
+      redirectTo: redirectTarget
     }
   });
 }
