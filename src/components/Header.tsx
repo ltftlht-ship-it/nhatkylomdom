@@ -67,6 +67,8 @@ interface HeaderProps {
   onToggleHideNoiseRows?: () => void;
   onResetFilters?: () => void;
   authUser?: any;
+  isAdmin?: boolean;
+  onOpenConnectEA?: () => void;
   onOpenAuth?: () => void;
   onSignOut?: () => void;
 }
@@ -84,6 +86,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
   onOpenImport,
   authUser,
+  isAdmin,
+  onOpenConnectEA,
   onOpenAuth,
   onSignOut,
   supabaseStatus = 'demo',
@@ -416,9 +420,29 @@ export const Header: React.FC<HeaderProps> = ({
         {authUser ? (
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl clay-card border border-[var(--border-main)] text-xs font-mono shrink-0">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            {isAdmin ? (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                👑 ADMIN
+              </span>
+            ) : (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-teal-500/20 text-teal-600 dark:text-teal-400 border border-teal-500/30">
+                TRADER
+              </span>
+            )}
             <span className="text-[var(--text-primary)] font-semibold max-w-[120px] truncate" title={authUser.email}>
               {authUser.email?.split('@')[0] || 'User'}
             </span>
+
+            {/* Nút Mã EA MT5 cho khách hàng kết nối */}
+            <button
+              type="button"
+              onClick={onOpenConnectEA}
+              className="px-2 py-0.5 rounded-lg bg-[var(--bg-subtle)] hover:bg-[var(--border-main)]/60 text-[var(--text-primary)] text-[10px] font-sans font-semibold border border-[var(--border-main)] transition-all cursor-pointer ml-1"
+              title="Xem mã kết nối EA MT5 của bạn"
+            >
+              Mã EA
+            </button>
+
             <button
               type="button"
               onClick={onSignOut}

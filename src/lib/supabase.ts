@@ -450,8 +450,12 @@ export function extractAccountsFromTrades(trades: any[]): DetectedAccountInfo[] 
  * Fetch toàn bộ danh sách lệnh từ Supabase, tối giản hóa query và lọc bằng Javascript
  * để tránh lỗi lệch kiểu dữ liệu hoặc lỗi điều kiện lọc.
  */
-export async function fetchTradesFromSupabase(accountId: string = "26610983"): Promise<SupabaseTradeRow[]> {
-  console.log("--> Đang gọi Supabase với accountId:", accountId);
+export async function fetchTradesFromSupabase(
+  accountId: string = "26610983",
+  currentUserId?: string,
+  isAdminUser: boolean = false
+): Promise<SupabaseTradeRow[]> {
+  console.log("--> Đang gọi Supabase với accountId:", accountId, "user:", currentUserId, "isAdmin:", isAdminUser);
 
   const client = getSupabaseClient();
   if (!client) {
@@ -493,14 +497,33 @@ export async function fetchTradesFromSupabase(accountId: string = "26610983"): P
   // Ghi nhận cấu trúc các cột thực tế của bảng trades để tối ưu khi update
   data.forEach(row => recordTradesTableColumns(row));
 
-  // Tự động phát hiện tất cả các tài khoản MT5 xuất hiện trong database
-  const detectedAccounts = extractAccountsFromTrades(data);
+  // Phân quyền đa người dùng thương mại (Multi-tenant data isolation)
+  let tenantData: any[] = data;
+  if (!isAdminUser) {
+    // Khách hàng / Học viên: CHỈ xem lệnh thuộc về user_id của chính họ
+    if (!currentUserId) return [];
+    tenantData = data.filter(item => {
+      const itemUserId = String(item.user_id ?? item.user_token ?? item.client_id ?? '').trim();
+      return itemUserId === String(currentUserId).trim();
+    });
+  } else {
+    // Quản trị viên (Thầy Tài): Xem kho dữ liệu gốc của Thầy
+    tenantData = data.filter(item => {
+      const itemUserId = String(item.user_id ?? item.user_token ?? item.client_id ?? '').trim();
+      return !itemUserId || itemUserId === String(currentUserId).trim() || itemUserId === 'admin';
+    });
+  }
+
+  if (!tenantData || tenantData.length === 0) return [];
+
+  // Tự động phát hiện tất cả các tài khoản MT5 xuất hiện trong database của tenant này
+  const detectedAccounts = extractAccountsFromTrades(tenantData);
 
   // Lọc dữ liệu bằng Javascript để đảm bảo an toàn tuyệt đối về kiểu dữ liệu (String/Number)
   const cleanTarget = String(accountId || '').replace(/^acc-/, '').trim();
-  const filteredData = (data as SupabaseTradeRow[]).filter(item => {
+  const filteredData = (tenantData as SupabaseTradeRow[]).filter(item => {
     const itemAcc = String(
-      item.account_id ?? item.account ?? item.login ?? item.mt5_account ?? item.user_id ?? ''
+      item.account_id ?? item.account ?? item.login ?? item.mt5_account ?? ''
     ).replace(/^acc-/, '').trim();
     if (itemAcc) {
       item.account_id = itemAcc;
@@ -672,7 +695,11 @@ const LOCAL_PLANS_KEY = 'trade_journal_plans';
  * Luôn fetch từ database Supabase với điều kiện .eq('account_id', selectedAccountId)
  * KHÔNG fallback sang mock/state cũ để phản ánh chính xác số lượng bản ghi thực tế.
  */
-export async function fetchPlansFromSupabase(accountId?: string): Promise<TradingPlan[]> {
+export async function fetchPlansFromSupabase(
+  accountId?: string,
+  currentUserId?: string,
+  isAdminUser: boolean = false
+): Promise<TradingPlan[]> {
   const cleanAccountId = accountId ? String(accountId).replace(/^acc-/, '').trim() : '';
 
   // Helper hàm lấy TOÀN BỘ plans từ LocalStorage
@@ -694,7 +721,6 @@ export async function fetchPlansFromSupabase(accountId?: string): Promise<Tradin
     }
     return list.filter(p => {
       const pAcc = String(p.account_id || '').replace(/^acc-/, '').trim();
-      // Phân tách tài khoản tuyệt đối: chỉ lấy plan thuộc đúng cleanAccountId
       return pAcc === cleanAccountId;
     });
   };
@@ -705,7 +731,7 @@ export async function fetchPlansFromSupabase(accountId?: string): Promise<Tradin
       return getLocalStoragePlans();
     }
 
-    // Tải toàn bộ Plans của Thầy trên Supabase để không bao giờ bị mất hoặc ẩn nhầm Plan
+    // Tải toàn bộ Plans từ Supabase
     let query = client
       .from('plans')
       .select('*')
@@ -724,8 +750,20 @@ export async function fetchPlansFromSupabase(accountId?: string): Promise<Tradin
     }
 
     if (data && data.length > 0) {
-      console.log(`[fetchPlansFromSupabase] Đã nạp ${data.length} plans từ Supabase cho account: ${cleanAccountId || 'ALL'}`);
-      const remotePlans: TradingPlan[] = data.map((item: any) => ({
+      // Phân quyền đa người dùng cho Plans
+      let tenantData = data;
+      if (!isAdminUser) {
+        if (!currentUserId) return [];
+        tenantData = data.filter((item: any) => String(item.user_id ?? '').trim() === String(currentUserId).trim());
+      } else {
+        tenantData = data.filter((item: any) => {
+          const itemUserId = String(item.user_id ?? '').trim();
+          return !itemUserId || itemUserId === String(currentUserId).trim() || itemUserId === 'admin';
+        });
+      }
+
+      console.log(`[fetchPlansFromSupabase] Đã nạp ${tenantData.length} plans từ Supabase cho user: ${currentUserId || 'Admin'}`);
+      const remotePlans: TradingPlan[] = tenantData.map((item: any) => ({
         id: String(item.id),
         account_id: item.account_id ? String(item.account_id) : (cleanAccountId || undefined),
         plan_name: item.plan_name || item.title || `${item.symbol || 'PLAN'} - ${item.created_at?.slice(0, 16) || ''}`,

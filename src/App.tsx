@@ -62,6 +62,7 @@ import { ImportModal } from './components/ImportModal';
 import { ImageViewerModal } from './components/ImageViewerModal';
 import { AuthModal } from './components/AuthModal';
 import { AuthGateScreen } from './components/AuthGateScreen';
+import { ConnectEAModal } from './components/ConnectEAModal';
 import { OverviewTab } from './components/OverviewTab';
 import { PlansTab } from './components/PlansTab';
 import { ChartTab } from './components/ChartTab';
@@ -374,6 +375,7 @@ export default function App() {
   const [isChecklistEditorOpen, setIsChecklistEditorOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isConnectEAOpen, setIsConnectEAOpen] = useState(false);
   const [authLoading, setAuthLoading] = useState<boolean>(true);
   const [authUser, setAuthUser] = useState<any>(null);
   const [adminPinInput, setAdminPinInput] = useState<string>('');
@@ -456,8 +458,8 @@ export default function App() {
   // 1. Tách biệt Lệnh Pending ('PENDING_PLAN', 'OPEN', 'PENDING') và Lệnh Closed ('CLOSED')
   // 2. Tính Running Balance trên mảng tăng dần, sau đó reverse để lệnh mới nhất lên đầu
   const loadTrades = useCallback(async (targetAccountId?: string, isSilent = false) => {
-    // Chỉ nạp dữ liệu thật nếu đã đăng nhập và là Quản trị viên (Admin)
-    if (!authUser || !isAdmin) {
+    // Chỉ nạp dữ liệu khi đã đăng nhập
+    if (!authUser) {
       if (!isSilent) setIsRefreshingSupabase(false);
       return;
     }
@@ -469,7 +471,7 @@ export default function App() {
     }
 
     try {
-      const data = await fetchTradesFromSupabase(String(accId));
+      const data = await fetchTradesFromSupabase(String(accId), authUser?.id, isAdmin);
       const detectedAccounts: DetectedAccountInfo[] = (data as any)?.detectedAccounts || extractAccountsFromTrades(data);
 
       const allRaw: any[] = (data as any)?.allRawTrades || data || [];
@@ -788,11 +790,15 @@ export default function App() {
     };
   }, [loadTrades, selectedAccountId]);
 
-  // Nạp danh sách Plans từ Supabase theo selectedAccountId
+  // Nạp danh sách Plans từ Supabase theo selectedAccountId và User
   const loadPlans = useCallback(async (accId: string = selectedAccountId) => {
+    if (!authUser) {
+      setPlans([]);
+      return [];
+    }
     try {
       const cleanAccId = String(accId || '').replace(/^acc-/, '').trim();
-      const remotePlans = await fetchPlansFromSupabase(cleanAccId);
+      const remotePlans = await fetchPlansFromSupabase(cleanAccId, authUser?.id, isAdmin);
       // Luôn setPlans kể cả khi rỗng [] để tài khoản không bị dính plan của tài khoản trước
       setPlans(remotePlans || []);
       return remotePlans || [];
@@ -801,7 +807,7 @@ export default function App() {
       setPlans([]);
       return [];
     }
-  }, [selectedAccountId]);
+  }, [selectedAccountId, authUser, isAdmin]);
 
   useEffect(() => {
     loadPlans(selectedAccountId);
@@ -1285,73 +1291,6 @@ export default function App() {
     );
   }
 
-  // 3. Nếu ĐÃ ĐĂNG NHẬP NHƯNG KHÔNG PHẢI ADMIN (Thầy Tài)
-  if (!isAdmin) {
-    const handleClaimAdminWithPin = (e: React.FormEvent) => {
-      e.preventDefault();
-      setAdminPinError(null);
-      const cleanPin = adminPinInput.trim();
-      if (cleanPin === '8888' || cleanPin.toLowerCase() === 'bigdeal' || cleanPin.toLowerCase() === 'nhatkylomdom') {
-        try {
-          localStorage.setItem('deal_admin_email', authUser.email || '');
-        } catch {}
-        setAdminClaimed(true);
-      } else {
-        setAdminPinError('Mã PIN xác thực Quản trị viên không chính xác.');
-      }
-    };
-
-    return (
-      <div className="min-h-screen w-full flex items-center justify-center p-4 bg-[var(--bg-main)] text-[var(--text-primary)] select-none font-sans">
-        <div className="max-w-md w-full clay-card p-7 rounded-2xl border border-[var(--border-main)] flex flex-col items-center text-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-500 shadow-sm">
-            <Lock className="w-6 h-6" />
-          </div>
-          <h2 className="text-base font-bold font-mono text-[var(--text-primary)]">Tài Khoản Không Có Quyền Xem</h2>
-          <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-            Tài khoản <span className="font-mono font-bold text-teal-400">{authUser.email}</span> không phải là Quản trị viên (Admin) sở hữu kho giao dịch này. Dữ liệu lệnh và tài khoản MT5 được bảo mật tuyệt đối.
-          </p>
-
-          <form onSubmit={handleClaimAdminWithPin} className="w-full flex flex-col gap-2 pt-2 border-t border-[var(--border-main)] text-xs">
-            <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)] font-semibold">
-              <Key className="w-3.5 h-3.5 text-teal-400" />
-              <span>Nếu bạn là Thầy Tài, nhập mã PIN Quản trị:</span>
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="password"
-                value={adminPinInput}
-                onChange={(e) => setAdminPinInput(e.target.value)}
-                placeholder="Nhập mã PIN (8888)..."
-                className="flex-1 px-3 py-2 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-main)] text-xs font-mono focus:outline-none focus:border-teal-500"
-              />
-              <button
-                type="submit"
-                className="px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs cursor-pointer transition-all shrink-0"
-              >
-                Mở Khóa
-              </button>
-            </div>
-            {adminPinError && (
-              <span className="text-[11px] text-rose-500 text-left">{adminPinError}</span>
-            )}
-          </form>
-
-          <button
-            type="button"
-            onClick={async () => {
-              await signOutAuthUser();
-              setAuthUser(null);
-            }}
-            className="w-full mt-2 py-2 px-4 rounded-xl clay-btn-secondary hover:border-rose-500 text-rose-500 font-semibold text-xs cursor-pointer transition-all"
-          >
-            Đăng xuất tài khoản này
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex h-screen w-screen bg-[var(--bg-main)] text-[var(--text-primary)] overflow-hidden select-none transition-colors duration-200">
       {/* 1. APP SHELL SIDEBAR */}
@@ -1391,6 +1330,8 @@ export default function App() {
           onOpenSettings={() => setIsSettingsOpen(true)}
           onOpenImport={() => setIsImportOpen(true)}
           authUser={authUser}
+          isAdmin={isAdmin}
+          onOpenConnectEA={() => setIsConnectEAOpen(true)}
           onOpenAuth={() => setIsAuthOpen(true)}
           onSignOut={async () => {
             await signOutAuthUser();
@@ -1618,6 +1559,15 @@ export default function App() {
         onSuccess={() => {
           setIsAuthOpen(false);
         }}
+      />
+
+      {/* Connect EA MT5 Modal (Dành cho khách hàng lấy User Token kết nối MT5) */}
+      <ConnectEAModal
+        isOpen={isConnectEAOpen}
+        onClose={() => setIsConnectEAOpen(false)}
+        userId={authUser?.id || ''}
+        userEmail={authUser?.email}
+        isAdmin={isAdmin}
       />
     </div>
   );
