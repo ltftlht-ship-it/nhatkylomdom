@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/tradingview-calendar/:path*",
+      "destination": "https://economic-calendar.tradingview.com/:path*"
+    },
+    {
+      "source": "/api/forexfactory/:path*",
+      "destination": "https://nfs.faireconomy.media/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

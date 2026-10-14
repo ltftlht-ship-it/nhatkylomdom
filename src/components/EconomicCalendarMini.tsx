@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { RotateCw, Check, X } from 'lucide-react';
+import { FALLBACK_CALENDAR_EVENTS } from '../data/calendarData';
 
 export interface MiniCalendarEvent {
   title: string;
@@ -24,8 +25,17 @@ const CURRENCIES_CONFIG = [
 ];
 
 export const EconomicCalendarMini: React.FC = () => {
-  const [events, setEvents] = useState<MiniCalendarEvent[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [events, setEvents] = useState<MiniCalendarEvent[]>(() => {
+    try {
+      const saved = localStorage.getItem('deal_calendar_events_cache_v2');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return FALLBACK_CALENDAR_EVENTS || [];
+  });
+  const [isLoading, setIsLoading] = useState(false);
 
   // MẶC ĐỊNH AUTO HIỆN CẢ TUẦN
   const [timeFilter, setTimeFilter] = useState<'WEEK' | 'TODAY'>(() => {
@@ -57,7 +67,7 @@ export const EconomicCalendarMini: React.FC = () => {
     } catch {
       // fallback
     }
-    return ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'NZD'];
+    return ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'NZD', 'CNY'];
   });
 
   // State mở popover modal Settings
@@ -123,40 +133,107 @@ export const EconomicCalendarMini: React.FC = () => {
     localStorage.setItem('deal_calendar_currencies', JSON.stringify([]));
   };
 
+  const getWeekRangeForTV = () => {
+    const now = new Date();
+    const day = now.getDay();
+    const diffToMonday = (day === 0 ? -6 : 1) - day;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + diffToMonday - 1);
+    monday.setHours(0, 0, 0, 0);
+
+    const nextSunday = new Date(monday);
+    nextSunday.setDate(monday.getDate() + 8);
+    nextSunday.setHours(23, 59, 59, 999);
+
+    return {
+      from: monday.toISOString(),
+      to: nextSunday.toISOString()
+    };
+  };
+
   const fetchCalendar = async () => {
     setIsLoading(true);
-    try {
-      let res: Response | null = null;
-      try {
-        res = await fetch('/api/forexfactory/ff_calendar_thisweek.json');
-      } catch {
-        res = null;
-      }
+    let loadedEvents: MiniCalendarEvent[] | null = null;
 
-      if (!res || !res.ok) {
-        try {
-          res = await fetch(
-            'https://api.allorigins.win/raw?url=' +
-              encodeURIComponent('https://nfs.faireconomy.media/ff_calendar_thisweek.json')
-          );
-        } catch {
-          res = null;
+    // NGUỒN 1: File dữ liệu tuần này nội bộ (Tốc độ 0ms, không phụ thuộc mạng ngoài, 100% thành công)
+    try {
+      const staticRes = await fetch('/economic_calendar_thisweek.json');
+      if (staticRes.ok) {
+        const staticData = await staticRes.json();
+        if (Array.isArray(staticData) && staticData.length > 0) {
+          loadedEvents = staticData;
+          setEvents(staticData);
+          try {
+            localStorage.setItem('deal_calendar_events_cache_v2', JSON.stringify(staticData));
+          } catch {}
         }
       }
+    } catch (err) {
+      console.warn('Lỗi nạp file static lịch kinh tế:', err);
+    }
 
-      if (!res || !res.ok) {
-        res = await fetch('https://nfs.faireconomy.media/ff_calendar_thisweek.json');
-      }
+    // NGUỒN 2: TradingView Official Economic Calendar (Cập nhật thời gian thực mới nhất)
+    try {
+      const { from, to } = getWeekRangeForTV();
+      const tvUrl = `/api/tradingview-calendar/events?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+      const res = await fetch(tvUrl);
+      if (res.ok) {
+        const json = await res.json();
+        const rawList = Array.isArray(json?.result) ? json.result : (Array.isArray(json) ? json : []);
+        if (rawList.length > 0) {
+          const mappedTV: MiniCalendarEvent[] = rawList.map((item: any) => {
+            let impact: 'High' | 'Medium' | 'Low' | 'Holiday' = 'Low';
+            const cat = String(item.category || '').toLowerCase();
+            const titleLower = String(item.title || item.indicator || '').toLowerCase();
+            if (cat === 'hol' || titleLower.includes('holiday') || titleLower.includes('nghỉ lễ')) {
+              impact = 'Holiday';
+            } else if (item.importance === 1) {
+              impact = 'High';
+            } else if (item.importance === 0) {
+              impact = 'Medium';
+            }
 
-      if (res && res.ok) {
-        const data: MiniCalendarEvent[] = await res.json();
-        setEvents(data || []);
+            return {
+              title: item.title || item.indicator || 'Sự kiện kinh tế',
+              country: (item.currency || item.country || 'USD').toUpperCase().trim(),
+              date: item.date,
+              impact: impact,
+              forecast: item.forecast != null ? `${item.forecast}${item.unit || ''}` : '',
+              previous: item.previous != null ? `${item.previous}${item.unit || ''}` : '',
+            };
+          });
+
+          loadedEvents = mappedTV;
+          setEvents(mappedTV);
+          try {
+            localStorage.setItem('deal_calendar_events_cache_v2', JSON.stringify(mappedTV));
+          } catch {}
+        }
       }
     } catch (err) {
-      console.warn('Lỗi tải lịch kinh tế:', err);
-    } finally {
-      setIsLoading(false);
+      console.warn('Lỗi tải từ TradingView Economic Calendar:', err);
     }
+
+    // NGUỒN 3: ForexFactory (dự phòng)
+    if (!loadedEvents || loadedEvents.length === 0) {
+      try {
+        const ffRes = await fetch('/api/forexfactory/ff_calendar_thisweek.json');
+        if (ffRes.ok) {
+          const data = await ffRes.json();
+          if (Array.isArray(data) && data.length > 0) {
+            loadedEvents = data;
+            setEvents(data);
+            try {
+              localStorage.setItem('deal_calendar_events_cache_v2', JSON.stringify(data));
+            } catch {}
+          }
+        }
+      } catch (err) {
+        console.warn('Lỗi tải từ ForexFactory:', err);
+      }
+    }
+
+    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -202,28 +279,28 @@ export const EconomicCalendarMini: React.FC = () => {
     const now = new Date();
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-    return events.filter((ev) => {
-      // 1. Lọc theo Mức độ Impact (Hỗ trợ multi-select: RED, ORANGE, GRAY)
-      if (selectedImpacts.length === 0) return false;
+    // Bảo vệ bộ lọc: nếu người dùng vô tình bỏ chọn hết thì fallback về mức an toàn thay vì làm trống bảng
+    const activeImpacts = selectedImpacts.length > 0 ? selectedImpacts : ['RED', 'ORANGE'];
+    const activeCurrencies = selectedCurrencies.length > 0 
+      ? selectedCurrencies 
+      : ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'NZD', 'CNY'];
 
+    let filtered = events.filter((ev) => {
+      // 1. Lọc theo Mức độ Impact (Hỗ trợ multi-select: RED, ORANGE, GRAY)
       const isRed = ev.impact === 'High';
       const isOrange = ev.impact === 'Medium';
       const isGray = isHolidayEvent(ev);
 
       let matchesImpact = false;
-      if (selectedImpacts.includes('RED') && isRed) matchesImpact = true;
-      if (selectedImpacts.includes('ORANGE') && isOrange) matchesImpact = true;
-      if (selectedImpacts.includes('GRAY') && isGray) matchesImpact = true;
+      if (activeImpacts.includes('RED') && isRed) matchesImpact = true;
+      if (activeImpacts.includes('ORANGE') && isOrange) matchesImpact = true;
+      if (activeImpacts.includes('GRAY') && isGray) matchesImpact = true;
 
       if (!matchesImpact) return false;
 
       // 2. Lọc theo Đồng tiền / Symbol
-      if (selectedCurrencies.length > 0) {
-        const cur = (ev.country || '').trim().toUpperCase();
-        if (cur !== 'ALL' && !selectedCurrencies.includes(cur)) return false;
-      } else {
-        return false;
-      }
+      const cur = (ev.country || '').trim().toUpperCase();
+      if (cur !== 'ALL' && !activeCurrencies.includes(cur)) return false;
 
       // 3. Lọc theo Thời gian (Hôm nay hay Cả tuần)
       if (timeFilter === 'TODAY') {
@@ -236,6 +313,29 @@ export const EconomicCalendarMini: React.FC = () => {
         }
       }
       return true;
+    });
+
+    // Nếu lọc Hôm Nay mà hôm nay không còn tin nào (hoặc đã qua hết), tự động nạp các tin trong tuần để không bị trống rỗng!
+    if (filtered.length === 0 && timeFilter === 'TODAY') {
+      filtered = events.filter((ev) => {
+        const isRed = ev.impact === 'High';
+        const isOrange = ev.impact === 'Medium';
+        const isGray = isHolidayEvent(ev);
+        let matchesImpact = false;
+        if (activeImpacts.includes('RED') && isRed) matchesImpact = true;
+        if (activeImpacts.includes('ORANGE') && isOrange) matchesImpact = true;
+        if (activeImpacts.includes('GRAY') && isGray) matchesImpact = true;
+        if (!matchesImpact) return false;
+        const cur = (ev.country || '').trim().toUpperCase();
+        if (cur !== 'ALL' && !activeCurrencies.includes(cur)) return false;
+        return true;
+      });
+    }
+
+    return filtered.sort((a, b) => {
+      const timeA = new Date(a.date).getTime() || 0;
+      const timeB = new Date(b.date).getTime() || 0;
+      return timeA - timeB;
     });
   }, [events, selectedImpacts, timeFilter, selectedCurrencies]);
 
@@ -251,6 +351,32 @@ export const EconomicCalendarMini: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-1.5 relative z-30">
+          {/* NÚT CHUYỂN NHANH TUẦN / HÔM NAY ĐƯA RA NGOÀI */}
+          <div className="flex items-center clay-well p-0.5 rounded-full border border-[var(--border-main)]/50">
+            <button
+              type="button"
+              onClick={() => handleToggleTimeFilter('WEEK')}
+              className={`px-2 py-0.5 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${
+                timeFilter === 'WEEK'
+                  ? 'clay-pill text-[#1d1b17] font-bold bg-white shadow-xs'
+                  : 'text-[var(--text-muted)] hover:text-[#1d1b17]'
+              }`}
+            >
+              Tuần Này
+            </button>
+            <button
+              type="button"
+              onClick={() => handleToggleTimeFilter('TODAY')}
+              className={`px-2 py-0.5 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${
+                timeFilter === 'TODAY'
+                  ? 'clay-pill text-[#1d1b17] font-bold bg-white shadow-xs'
+                  : 'text-[var(--text-muted)] hover:text-[#1d1b17]'
+              }`}
+            >
+              Hôm Nay
+            </button>
+          </div>
+
           {/* BỘ NÚT TÙY CHỌN & TẢI LẠI THEO CHUẨN CLAY-PILL */}
           <div className="flex items-center clay-well p-0.5 rounded-full border border-[var(--border-main)]/50">
             <button
@@ -499,7 +625,25 @@ export const EconomicCalendarMini: React.FC = () => {
             {!isLoading && filteredEvents.length === 0 && (
               <tr className="h-[132px]">
                 <td colSpan={4} className="py-4 text-center text-[#1d1b17] text-xs">
-                  Không có tin tức nào phù hợp bộ lọc.
+                  <div className="flex flex-col items-center justify-center gap-1.5">
+                    <span>Không có tin tức nào phù hợp bộ lọc hiện tại.</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedImpacts(['RED', 'ORANGE', 'GRAY']);
+                        setTimeFilter('WEEK');
+                        handleSelectAllCurrencies();
+                        try {
+                          localStorage.removeItem('deal_calendar_impacts_multi_v1');
+                          localStorage.removeItem('deal_calendar_time_filter');
+                          localStorage.removeItem('deal_calendar_currencies');
+                        } catch {}
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-main)] text-[11px] font-semibold text-[#1d1b17] hover:bg-white transition-all cursor-pointer shadow-xs"
+                    >
+                      Bấm vào đây để hiện toàn bộ tin tuần này ({events.length} tin)
+                    </button>
+                  </div>
                 </td>
               </tr>
             )}

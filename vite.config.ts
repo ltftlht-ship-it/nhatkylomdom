@@ -20,6 +20,16 @@ export default defineConfig(() => {
           changeOrigin: true,
           rewrite: (p) => p.replace(/^\/api\/forexfactory/, ''),
         },
+        '/api/tradingview-calendar': {
+          target: 'https://economic-calendar.tradingview.com',
+          changeOrigin: true,
+          headers: {
+            'Origin': 'https://www.tradingview.com',
+            'Referer': 'https://www.tradingview.com/',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          },
+          rewrite: (p) => p.replace(/^\/api\/tradingview-calendar/, ''),
+        },
         '/api/yahoo': {
           target: 'https://query1.finance.yahoo.com',
           changeOrigin: true,
