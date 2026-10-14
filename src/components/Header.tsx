@@ -71,6 +71,7 @@ interface HeaderProps {
   onOpenConnectEA?: () => void;
   onOpenAuth?: () => void;
   onSignOut?: () => void;
+  onOpenLicenseManager?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -90,6 +91,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenConnectEA,
   onOpenAuth,
   onSignOut,
+  onOpenLicenseManager,
   supabaseStatus = 'demo',
   onSync,
   isSyncing = false,
@@ -432,6 +434,18 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="text-[var(--text-primary)] font-semibold max-w-[120px] truncate" title={authUser.email}>
               {authUser.email?.split('@')[0] || 'User'}
             </span>
+
+            {/* Nút Quản Lý Bản Quyền Dành Riêng Cho Admin (Thầy Tài) */}
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={onOpenLicenseManager}
+                className="px-2 py-0.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/25 text-amber-500 text-[10px] font-sans font-bold border border-amber-500/40 transition-all cursor-pointer ml-1"
+                title="Quản lý khách hàng bản quyền & số MT5 được duyệt"
+              >
+                👑 Bản Quyền
+              </button>
+            )}
 
             {/* Nút Mã EA MT5 cho khách hàng kết nối */}
             <button

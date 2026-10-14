@@ -63,6 +63,10 @@ import { ImageViewerModal } from './components/ImageViewerModal';
 import { AuthModal } from './components/AuthModal';
 import { AuthGateScreen } from './components/AuthGateScreen';
 import { ConnectEAModal } from './components/ConnectEAModal';
+import { LicenseGateScreen } from './components/LicenseGateScreen';
+import { LicenseManagerModal } from './components/LicenseManagerModal';
+import { verifyUserLicense } from './lib/licenseApi';
+import { LicenseCheckResult } from './types/license';
 import { OverviewTab } from './components/OverviewTab';
 import { PlansTab } from './components/PlansTab';
 import { ChartTab } from './components/ChartTab';
@@ -404,6 +408,37 @@ export default function App() {
     return checkIsAdmin(authUser) || adminClaimed;
   }, [authUser, adminClaimed]);
 
+  // Quản lý Bản Quyền Thương Mại (Commercial License Gate)
+  const [isLicenseManagerOpen, setIsLicenseManagerOpen] = useState(false);
+  const [licenseCheck, setLicenseCheck] = useState<LicenseCheckResult | null>(null);
+  const [licenseLoading, setLicenseLoading] = useState(false);
+
+  useEffect(() => {
+    if (!authUser) {
+      setLicenseCheck(null);
+      return;
+    }
+    // Nếu là Admin Thầy Tài -> Miễn kiểm tra, toàn quyền
+    if (isAdmin) {
+      setLicenseCheck({
+        isValid: true,
+        isExpired: false,
+        isBlocked: false,
+        allowedAccountsList: [],
+        message: '👑 Quản trị viên tối cao'
+      });
+      return;
+    }
+
+    setLicenseLoading(true);
+    verifyUserLicense(authUser.email, false).then(res => {
+      setLicenseCheck(res);
+      setLicenseLoading(false);
+    }).catch(() => {
+      setLicenseLoading(false);
+    });
+  }, [authUser, isAdmin]);
+
   const [imageViewer, setImageViewer] = useState<{ isOpen: boolean; url: string; title: string }>({
     isOpen: false,
     url: '',
@@ -569,7 +604,14 @@ export default function App() {
 
       // Phân tách tài khoản đa người dùng thương mại (Multi-tenant Account Isolation)
       if (!isAdmin) {
-        const userAccList: AccountInfo[] = (detectedAccounts || []).map(d => {
+        const allowedList = licenseCheck?.allowedAccountsList || [];
+        const filteredDetected = (detectedAccounts || []).filter(d => {
+          if (allowedList.length === 0) return true;
+          const cleanId = String(d.id).replace(/^acc-/, '').trim();
+          return allowedList.includes(cleanId);
+        });
+
+        const userAccList: AccountInfo[] = filteredDetected.map(d => {
           const cleanId = String(d.id).replace(/^acc-/, '').trim();
           const accStats = tradesByAccount.get(cleanId);
           const initBal = d.initial_balance || accStats?.initialBal || 10000;
@@ -1366,6 +1408,30 @@ export default function App() {
     );
   }
 
+  // 3. Nếu KHÔNG PHẢI ADMIN và CHƯA CÓ BẢN QUYỀN / BẢN QUYỀN HẾT HẠN -> Khóa cửa LicenseGateScreen
+  if (!isAdmin && licenseCheck && !licenseCheck.isValid) {
+    return (
+      <LicenseGateScreen
+        userEmail={authUser.email || ''}
+        errorMessage={licenseCheck.message}
+        isExpired={licenseCheck.isExpired}
+        isBlocked={licenseCheck.isBlocked}
+        onRefreshCheck={async () => {
+          const res = await verifyUserLicense(authUser.email, false);
+          setLicenseCheck(res);
+        }}
+        onSignOut={async () => {
+          try {
+            localStorage.removeItem('deal_admin_session');
+            localStorage.removeItem('deal_user_session');
+          } catch {}
+          await signOutAuthUser();
+          setAuthUser(null);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="flex h-screen w-screen bg-[var(--bg-main)] text-[var(--text-primary)] overflow-hidden select-none transition-colors duration-200">
       {/* 1. APP SHELL SIDEBAR */}
@@ -1407,6 +1473,7 @@ export default function App() {
           authUser={authUser}
           isAdmin={isAdmin}
           onOpenConnectEA={() => setIsConnectEAOpen(true)}
+          onOpenLicenseManager={() => setIsLicenseManagerOpen(true)}
           onOpenAuth={() => setIsAuthOpen(true)}
           onSignOut={async () => {
             try {
@@ -1648,6 +1715,14 @@ export default function App() {
         userEmail={authUser?.email}
         isAdmin={isAdmin}
       />
+
+      {/* License Manager Modal (Dành riêng cho Admin Thầy Tài quản lý khách hàng & số MT5) */}
+      {isAdmin && (
+        <LicenseManagerModal
+          isOpen={isLicenseManagerOpen}
+          onClose={() => setIsLicenseManagerOpen(false)}
+        />
+      )}
     </div>
   );
 }
