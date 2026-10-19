@@ -468,7 +468,7 @@ export default function App() {
     }
 
     try {
-      const data = await fetchTradesFromSupabase(String(accId), authUser?.id, isAdmin);
+      const data = await fetchTradesFromSupabase(String(accId), authUser?.id, isAdmin, licenseCheck?.allowedAccountsList || []);
       const detectedAccounts: DetectedAccountInfo[] = (data as any)?.detectedAccounts || extractAccountsFromTrades(data);
 
       const allRaw: any[] = (data as any)?.allRawTrades || data || [];
@@ -784,7 +784,7 @@ export default function App() {
       const now = new Date();
       setLastSyncTime(now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     }
-  }, [settings.contract_sizes, settings.timezone_offset_hours, activeAccount, authUser, isAdmin]);
+  }, [settings.contract_sizes, settings.timezone_offset_hours, activeAccount, authUser, isAdmin, licenseCheck]);
 
   // Tự động gọi API Supabase, lắng nghe Realtime WebSocket và Heartbeat Auto-polling
   useEffect(() => {
@@ -831,7 +831,7 @@ export default function App() {
     }
     try {
       const cleanAccId = String(accId || '').replace(/^acc-/, '').trim();
-      const remotePlans = await fetchPlansFromSupabase(cleanAccId, authUser?.id, isAdmin);
+      const remotePlans = await fetchPlansFromSupabase(cleanAccId, authUser?.id, isAdmin, licenseCheck?.allowedAccountsList || []);
       // Luôn setPlans kể cả khi rỗng [] để tài khoản không bị dính plan của tài khoản trước
       setPlans(remotePlans || []);
       return remotePlans || [];
@@ -840,7 +840,7 @@ export default function App() {
       setPlans([]);
       return [];
     }
-  }, [selectedAccountId, authUser, isAdmin]);
+  }, [selectedAccountId, authUser, isAdmin, licenseCheck]);
 
   useEffect(() => {
     loadPlans(selectedAccountId);

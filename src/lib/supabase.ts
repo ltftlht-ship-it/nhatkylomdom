@@ -438,7 +438,8 @@ export function extractAccountsFromTrades(trades: any[]): DetectedAccountInfo[] 
 export async function fetchTradesFromSupabase(
   accountId: string = "",
   currentUserId?: string,
-  isAdminUser: boolean = false
+  isAdminUser: boolean = false,
+  allowedAccounts: string[] = []
 ): Promise<SupabaseTradeRow[]> {
   console.log("--> Đang gọi Supabase với accountId:", accountId, "user:", currentUserId, "isAdmin:", isAdminUser);
 
@@ -483,19 +484,15 @@ export async function fetchTradesFromSupabase(
   data.forEach(row => recordTradesTableColumns(row));
 
   // Phân quyền đa người dùng thương mại (Multi-tenant data isolation)
+  // Supabase (RLS trong supabase/lock_tables.sql) chỉ trả về lệnh người dùng được phép xem.
+  // Lọc thêm ở đây theo số tài khoản MT5 trong bản quyền để an toàn kép.
   let tenantData: any[] = data;
   if (!isAdminUser) {
-    // Khách hàng / Học viên: CHỈ xem lệnh thuộc về user_id của chính họ
     if (!currentUserId) return [];
+    const allowed = new Set(allowedAccounts.map(a => String(a).replace(/^acc-/, '').trim()));
     tenantData = data.filter(item => {
-      const itemUserId = String(item.user_id ?? item.user_token ?? item.client_id ?? '').trim();
-      return itemUserId === String(currentUserId).trim();
-    });
-  } else {
-    // Quản trị viên (Thầy Tài): Xem kho dữ liệu gốc của Thầy
-    tenantData = data.filter(item => {
-      const itemUserId = String(item.user_id ?? item.user_token ?? item.client_id ?? '').trim();
-      return !itemUserId || itemUserId === String(currentUserId).trim() || itemUserId === 'admin';
+      const itemAcc = String(item.account_id ?? item.account ?? item.login ?? item.mt5_account ?? '').replace(/^acc-/, '').trim();
+      return allowed.has(itemAcc);
     });
   }
 
@@ -683,7 +680,8 @@ const LOCAL_PLANS_KEY = 'trade_journal_plans';
 export async function fetchPlansFromSupabase(
   accountId?: string,
   currentUserId?: string,
-  isAdminUser: boolean = false
+  isAdminUser: boolean = false,
+  allowedAccounts: string[] = []
 ): Promise<TradingPlan[]> {
   const cleanAccountId = accountId ? String(accountId).replace(/^acc-/, '').trim() : '';
 
@@ -736,15 +734,12 @@ export async function fetchPlansFromSupabase(
 
     if (data && data.length > 0) {
       // Phân quyền đa người dùng cho Plans
+      // Khách chỉ thấy plan của số tài khoản MT5 trong bản quyền (RLS trên Supabase cũng chặn như vậy)
       let tenantData = data;
       if (!isAdminUser) {
         if (!currentUserId) return [];
-        tenantData = data.filter((item: any) => String(item.user_id ?? '').trim() === String(currentUserId).trim());
-      } else {
-        tenantData = data.filter((item: any) => {
-          const itemUserId = String(item.user_id ?? '').trim();
-          return !itemUserId || itemUserId === String(currentUserId).trim() || itemUserId === 'admin';
-        });
+        const allowed = new Set(allowedAccounts.map(a => String(a).replace(/^acc-/, '').trim()));
+        tenantData = data.filter((item: any) => allowed.has(String(item.account_id ?? '').replace(/^acc-/, '').trim()));
       }
 
       console.log(`[fetchPlansFromSupabase] Đã nạp ${tenantData.length} plans từ Supabase cho user: ${currentUserId || 'Admin'}`);

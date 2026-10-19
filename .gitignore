@@ -6,3 +6,7 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Mat ma EA MT5 (chi luu tren may)
+*.local.sql
+mt5/*.local.mq5

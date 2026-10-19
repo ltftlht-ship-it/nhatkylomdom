@@ -92,7 +92,10 @@
     - Khởi động dev server: `cmd /c npm run dev`
 - **Môi trường Database**:
   - Supabase kết nối qua biến môi trường trong file `.env` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`).
-  - Các bảng chính: `trades`, `plans`, `accounts`, `settings`.
+  - Các bảng chính: `trades`, `plans`, `licenses`, `ea_keys` (bảng `accounts`, `settings` không tồn tại).
+  - Bảo mật Supabase nằm trong thư mục `supabase/`, chạy theo thứ tự: `security.sql` → `ea_gateway.sql` → `ea_keys.local.sql` (mật mã EA, chỉ có trên máy, không lên GitHub) → `lock_tables.sql` (chỉ chạy khi EA V4 đã đồng bộ được).
+  - Admin duy nhất: `ADMIN_EMAILS` trong `src/lib/supabase.ts`, phải khớp hàm `is_admin()` trong `supabase/security.sql`.
+- **EA MT5**: mã nguồn `mt5/FlatFintech_V4.mq5` (để trống `InpEaSecret`). EA ghi lệnh qua hàm `rpc/ea_upsert_trade` và `rpc/ea_update_status` có kiểm tra mật mã, không ghi thẳng vào bảng. Bản đã điền mật mã được cài trong thư mục `MQL5\Experts` của 2 terminal (Five Percent Online, Tk100k).
 
 ---
 
