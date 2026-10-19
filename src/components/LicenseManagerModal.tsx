@@ -30,8 +30,8 @@ export const LicenseManagerModal: React.FC<LicenseManagerModalProps> = ({ isOpen
     try {
       const data = await fetchLicenses();
       setLicenses(data);
-    } catch (e) {
-      console.warn('Lỗi tải licenses:', e);
+    } catch (e: any) {
+      setErrorMsg(e.message || 'Lỗi tải danh sách bản quyền.');
     } finally {
       setLoading(false);
     }
@@ -112,8 +112,8 @@ export const LicenseManagerModal: React.FC<LicenseManagerModalProps> = ({ isOpen
         status: nextStatus
       });
       await loadData();
-    } catch (err) {
-      console.warn('Lỗi đổi trạng thái license:', err);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Lỗi đổi trạng thái bản quyền.');
     }
   };
 
@@ -132,8 +132,8 @@ export const LicenseManagerModal: React.FC<LicenseManagerModalProps> = ({ isOpen
       });
       setSuccessMsg(`Đã gia hạn thêm 30 ngày cho: ${item.email}`);
       await loadData();
-    } catch (err) {
-      console.warn('Lỗi gia hạn license:', err);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Lỗi gia hạn bản quyền.');
     }
   };
 
@@ -142,8 +142,8 @@ export const LicenseManagerModal: React.FC<LicenseManagerModalProps> = ({ isOpen
     try {
       await deleteLicense(email);
       await loadData();
-    } catch (err) {
-      console.warn('Lỗi xóa license:', err);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Lỗi xóa bản quyền.');
     }
   };
 

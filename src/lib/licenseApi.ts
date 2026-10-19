@@ -1,74 +1,40 @@
 import { getSupabaseClient } from './supabase';
 import { LicenseItem, LicenseCheckResult } from '../types/license';
 
-const LOCAL_LICENSES_CACHE_KEY = 'bigdeal_commercial_licenses_cache';
+// Bản quyền chỉ lưu trên Supabase (bảng licenses, có RLS trong supabase/security.sql).
+// Không dùng cache localStorage: người dùng có thể tự sửa cache để tự cấp bản quyền.
 
-/**
- * Lấy danh sách bản quyền từ Local Cache
- */
-export function getLocalLicenses(): LicenseItem[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_LICENSES_CACHE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch (e) {
-    console.warn('Lỗi đọc cache licenses:', e);
-  }
-  return [];
+function requireClient() {
+  const client = getSupabaseClient();
+  if (!client) throw new Error('Chưa kết nối Supabase');
+  return client;
 }
 
 /**
- * Lưu danh sách bản quyền vào Local Cache
- */
-export function saveLocalLicenses(licenses: LicenseItem[]) {
-  try {
-    localStorage.setItem(LOCAL_LICENSES_CACHE_KEY, JSON.stringify(licenses));
-  } catch (e) {
-    console.warn('Lỗi ghi cache licenses:', e);
-  }
-}
-
-/**
- * Nạp toàn bộ danh sách bản quyền từ Supabase (dành cho Admin Thầy Tài)
+ * Nạp toàn bộ danh sách bản quyền từ Supabase (chỉ Admin đọc được nhờ RLS)
  */
 export async function fetchLicenses(): Promise<LicenseItem[]> {
-  try {
-    const client = getSupabaseClient();
-    if (client) {
-      const { data, error } = await client
-        .from('licenses')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (!error && Array.isArray(data)) {
-        const cleaned: LicenseItem[] = data.map(d => ({
-          id: d.id || String(Date.now()),
-          email: (d.email || '').toLowerCase().trim(),
-          allowed_accounts: d.allowed_accounts || '',
-          status: (d.status || 'ACTIVE').toUpperCase() as any,
-          expires_at: d.expires_at || null,
-          customer_name: d.customer_name || '',
-          notes: d.notes || '',
-          created_at: d.created_at || new Date().toISOString()
-        }));
-        saveLocalLicenses(cleaned);
-        return cleaned;
-      }
-    }
-  } catch (err) {
-    console.warn('Không thể kết nối Supabase licenses table:', err);
-  }
-
-  // Fallback đọc từ LocalStorage
-  return getLocalLicenses();
+  const { data, error } = await requireClient()
+    .from('licenses')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(`Không tải được bảng licenses: ${error.message}`);
+  return (data || []).map(d => ({
+    id: d.id,
+    email: (d.email || '').toLowerCase().trim(),
+    allowed_accounts: d.allowed_accounts || '',
+    status: (d.status || 'ACTIVE').toUpperCase() as any,
+    expires_at: d.expires_at || null,
+    customer_name: d.customer_name || '',
+    notes: d.notes || '',
+    created_at: d.created_at
+  }));
 }
 
 /**
  * Thêm hoặc Cập nhật Bản Quyền cho khách hàng
  */
-export async function saveLicense(license: Omit<LicenseItem, 'id'> & { id?: string }): Promise<LicenseItem> {
+export async function saveLicense(license: Omit<LicenseItem, 'id'> & { id?: string }): Promise<void> {
   const cleanEmail = (license.email || '').toLowerCase().trim();
   const cleanAccounts = (license.allowed_accounts || '')
     .split(',')
@@ -76,64 +42,24 @@ export async function saveLicense(license: Omit<LicenseItem, 'id'> & { id?: stri
     .filter(Boolean)
     .join(', ');
 
-  const itemToSave: LicenseItem = {
-    id: license.id || 'lic_' + btoa(cleanEmail).replace(/[^a-zA-Z0-9]/g, '').substring(0, 12),
+  const { error } = await requireClient().from('licenses').upsert({
     email: cleanEmail,
     allowed_accounts: cleanAccounts,
     status: license.status || 'ACTIVE',
     expires_at: license.expires_at || null,
     customer_name: license.customer_name || '',
-    notes: license.notes || '',
-    created_at: (license as any).created_at || new Date().toISOString()
-  };
-
-  // Cập nhật Local Cache ngay lập tức
-  const current = getLocalLicenses();
-  const index = current.findIndex(l => l.email === cleanEmail);
-  if (index >= 0) {
-    current[index] = { ...current[index], ...itemToSave };
-  } else {
-    current.unshift(itemToSave);
-  }
-  saveLocalLicenses(current);
-
-  // Đồng bộ lên Supabase nếu có bảng licenses
-  try {
-    const client = getSupabaseClient();
-    if (client) {
-      await client.from('licenses').upsert({
-        email: itemToSave.email,
-        allowed_accounts: itemToSave.allowed_accounts,
-        status: itemToSave.status,
-        expires_at: itemToSave.expires_at,
-        customer_name: itemToSave.customer_name,
-        notes: itemToSave.notes
-      }, { onConflict: 'email' });
-    }
-  } catch (err) {
-    console.warn('Supabase licenses remote upsert warning:', err);
-  }
-
-  return itemToSave;
+    notes: license.notes || ''
+  }, { onConflict: 'email' });
+  if (error) throw new Error(`Không lưu được bản quyền: ${error.message}`);
 }
 
 /**
  * Xóa bản quyền khách hàng
  */
-export async function deleteLicense(email: string): Promise<boolean> {
+export async function deleteLicense(email: string): Promise<void> {
   const cleanEmail = email.toLowerCase().trim();
-  const current = getLocalLicenses().filter(l => l.email !== cleanEmail);
-  saveLocalLicenses(current);
-
-  try {
-    const client = getSupabaseClient();
-    if (client) {
-      await client.from('licenses').delete().eq('email', cleanEmail);
-    }
-  } catch (err) {
-    console.warn('Lỗi xóa license trên Supabase:', err);
-  }
-  return true;
+  const { error } = await requireClient().from('licenses').delete().eq('email', cleanEmail);
+  if (error) throw new Error(`Không xóa được bản quyền: ${error.message}`);
 }
 
 /**
@@ -142,8 +68,8 @@ export async function deleteLicense(email: string): Promise<boolean> {
 export async function verifyUserLicense(email: string, isAdminUser: boolean = false): Promise<LicenseCheckResult> {
   const cleanEmail = (email || '').toLowerCase().trim();
 
-  // 1. Quản trị viên tối cao (Thầy Tài) luôn được miễn kiểm tra bản quyền
-  if (isAdminUser || cleanEmail === 'ltf.tlht@gmail.com' || cleanEmail.includes('nhatkylomdom')) {
+  // 1. Quản trị viên (đã xác thực qua checkIsAdmin) được miễn kiểm tra bản quyền
+  if (isAdminUser) {
     return {
       isValid: true,
       isExpired: false,
@@ -153,11 +79,46 @@ export async function verifyUserLicense(email: string, isAdminUser: boolean = fa
     };
   }
 
-  // 2. Nạp danh sách licenses
-  const licenses = await fetchLicenses();
-  const userLic = licenses.find(l => l.email === cleanEmail);
+  // 2. Chỉ đọc bản quyền của chính email này trực tiếp từ Supabase.
+  // Không dùng cache localStorage vì người dùng có thể tự sửa cache để tự cấp bản quyền.
+  let userLic: LicenseItem | undefined;
+  let fetchFailed = false;
+  try {
+    const client = getSupabaseClient();
+    if (!client) throw new Error('Chưa kết nối Supabase');
+    const { data, error } = await client
+      .from('licenses')
+      .select('*')
+      .eq('email', cleanEmail)
+      .maybeSingle();
+    if (error) throw error;
+    if (data) {
+      userLic = {
+        id: data.id,
+        email: (data.email || '').toLowerCase().trim(),
+        allowed_accounts: data.allowed_accounts || '',
+        status: (data.status || 'ACTIVE').toUpperCase() as any,
+        expires_at: data.expires_at || null,
+        customer_name: data.customer_name || '',
+        notes: data.notes || '',
+        created_at: data.created_at
+      };
+    }
+  } catch (err) {
+    console.warn('Không thể kiểm tra bản quyền trên Supabase:', err);
+    fetchFailed = true;
+  }
 
   if (!userLic) {
+    if (fetchFailed) {
+      return {
+        isValid: false,
+        isExpired: false,
+        isBlocked: false,
+        allowedAccountsList: [],
+        message: 'Không kết nối được máy chủ bản quyền. Vui lòng thử lại.'
+      };
+    }
     return {
       isValid: false,
       isExpired: false,

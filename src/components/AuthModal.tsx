@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { X, Mail, Lock, LogIn, CheckCircle2, AlertCircle, Loader2, KeyRound } from 'lucide-react';
-import { signInWithEmailPassword, signUpWithEmailPassword, checkIsAdmin } from '../lib/supabase';
+import { X, Mail, Lock, LogIn, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { signInWithEmailPassword } from '../lib/supabase';
 import { useLanguage } from '../context/LanguageContext';
 
 interface AuthModalProps {
@@ -36,25 +36,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
       return;
     }
 
-    // Kiểm tra nhanh mã PIN Quản trị 8888
-    if (cleanPass === '8888' || cleanPass === 'bigdeal' || cleanPass === 'nhatkylomdom') {
-      const adminUser = {
-        id: 'c31f548a-a522-4a77-b88c-50aefd0c96e9',
-        email: cleanEmail || 'nhatkylomdom@gmail.com',
-        user_metadata: { user_name: 'nhatkylomdom', is_admin: true }
-      };
-      try {
-        localStorage.setItem('deal_admin_session', JSON.stringify(adminUser));
-      } catch {}
-      setSuccessMsg(language === 'vi' ? 'Xác thực Quản trị viên thành công!' : 'Admin authenticated!');
-      setTimeout(() => {
-        onSuccess?.();
-        onClose();
-        window.location.reload();
-      }, 500);
-      return;
-    }
-
     if (cleanPass.length < 6) {
       setErrorMsg(language === 'vi' ? 'Mật khẩu phải có tối thiểu 6 ký tự.' : 'Password must be at least 6 characters.');
       return;
@@ -63,43 +44,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
     try {
       setLoading(true);
 
-      const isAdminCandidate = 
-        cleanEmail === 'nhatkylomdom@gmail.com' || 
-        cleanEmail.includes('nhatkylomdom') ||
-        cleanEmail.includes('dangtai') ||
-        cleanEmail.includes('hoangngocdangtai');
-
-      let authUserResult: any = null;
-      try {
-        const { data, error } = await signInWithEmailPassword(cleanEmail, cleanPass);
-        if (!error && data?.user) {
-          authUserResult = data.user;
-        } else if (error) {
-          const { data: signUpData, error: signUpError } = await signUpWithEmailPassword(cleanEmail, cleanPass);
-          if (!signUpError && signUpData?.user) {
-            authUserResult = signUpData.user;
-          }
-        }
-      } catch (authErr) {
-        console.warn('Supabase remote auth check bypassed:', authErr);
-      }
-
-      if (!authUserResult) {
-        const uniqueId = 'trader_' + btoa(cleanEmail).replace(/[^a-zA-Z0-9]/g, '').substring(0, 16);
-        authUserResult = {
-          id: uniqueId,
-          email: cleanEmail,
-          user_metadata: {
-            user_name: cleanEmail.split('@')[0],
-            is_admin: isAdminCandidate
-          }
-        };
-      }
-
-      if (isAdminCandidate || checkIsAdmin(authUserResult)) {
-        localStorage.setItem('deal_admin_session', JSON.stringify(authUserResult));
-      } else {
-        localStorage.setItem('deal_user_session', JSON.stringify(authUserResult));
+      // Chỉ chấp nhận phiên do Supabase Auth cấp; sai mật khẩu là dừng, không tự dựng phiên
+      const { data, error } = await signInWithEmailPassword(cleanEmail, cleanPass);
+      if (error || !data?.user) {
+        setErrorMsg(language === 'vi' ? 'Sai email hoặc mật khẩu.' : 'Invalid email or password.');
+        return;
       }
 
       setSuccessMsg(language === 'vi' ? 'Đăng nhập thành công!' : 'Sign in successful!');
@@ -150,7 +99,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
           </div>
         )}
 
-        {/* Form Đăng Nhập Gmail & PIN */}
+        {/* Form Đăng Nhập Gmail */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
             <label className="text-[11px] font-semibold text-[var(--text-secondary)]">
@@ -172,7 +121,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
           <div className="flex flex-col gap-1">
             <label className="text-[11px] font-semibold text-[var(--text-secondary)] flex items-center justify-between">
               <span>{language === 'vi' ? 'Mật khẩu' : 'Password'}</span>
-              <span className="text-[10px] text-teal-500">Mã PIN Thầy Tài: 8888</span>
             </label>
             <div className="relative">
               <input

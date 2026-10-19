@@ -84,7 +84,7 @@
 
 ## 5. THIẾT LẬP MÔI TRƯỜNG & HƯỚNG DẪN LỆNH CHO CLAUDE
 - **Hệ điều hành**: Windows 11.
-- **Thư mục dự án**: `c:\Users\IVL\Documents\antigravity\calm-borg\BIG-deal`.
+- **Thư mục dự án**: `C:\Users\IVL\Desktop\Claude\big-deal` (bản cũ bên Antigravity: `c:\Users\IVL\Documents\antigravity\calm-borg\BIG-deal`).
 - **Git Repository**: `https://github.com/ltftlht-ship-it/nhatkylomdom.git` (nhánh `main`).
 - **Lưu ý thực thi lệnh trên Windows**:
   - Do chính sách Execution Policy của PowerShell, khi chạy lệnh npm cần dùng tiền tố `cmd /c`:

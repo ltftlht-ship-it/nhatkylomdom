@@ -336,38 +336,15 @@ export function subscribeToAuthChanges(callback: (user: User | null) => void) {
  * Kiểm tra xem người dùng hiện tại có phải là Admin (Thầy Tài) không.
  * Chỉ Admin mới được quyền truy cập toàn bộ dữ liệu MT5 và nhật ký lệnh gốc.
  */
+// Phải khớp với danh sách admin trong supabase/security.sql (hàm is_admin)
+export const ADMIN_EMAILS = ['ltf.tlht@gmail.com'];
+
 export function checkIsAdmin(user: User | null | any): boolean {
   if (!user) return false;
+  // Chỉ chấp nhận user do Supabase Auth cấp (không nhận object tự dựng trong localStorage)
+  if (user.aud !== 'authenticated') return false;
   const email = (user.email || '').toLowerCase().trim();
-  const userMetadata = user.user_metadata || {};
-  const userName = (userMetadata.user_name || userMetadata.preferred_username || '').toLowerCase().trim();
-
-  // Danh sách định danh Admin của Thầy (ltf.tlht@gmail.com / nhatkylomdom / ltftlht-ship-it / hoangngocdangtai)
-  const isAdminUser = 
-    email === 'ltf.tlht@gmail.com' ||
-    email.includes('ltf.tlht') ||
-    email.includes('ltftlht') ||
-    email === 'nhatkylomdom@gmail.com' ||
-    email.includes('nhatkylomdom') ||
-    userName === 'ltf.tlht' ||
-    userName === 'ltftlht' ||
-    userName === 'ltftlht-ship-it' ||
-    userName === 'nhatkylomdom' ||
-    email.includes('dangtai') ||
-    email.includes('hoangngocdangtai') ||
-    email.endsWith('@admin.com');
-
-  if (isAdminUser) return true;
-
-  // Hỗ trợ cấu hình thêm admin từ LocalStorage nếu Thầy dùng thêm email phụ
-  try {
-    const customAdmin = localStorage.getItem('deal_admin_email');
-    if (customAdmin && email === customAdmin.toLowerCase().trim()) {
-      return true;
-    }
-  } catch {}
-
-  return false;
+  return ADMIN_EMAILS.includes(email);
 }
 
 /**

@@ -81,60 +81,32 @@ export const AuthGateScreen: React.FC<AuthGateScreenProps> = ({ onLoginSuccess }
     try {
       setLoading(true);
 
-      const isAdminCandidate = 
-        cleanEmail === 'ltf.tlht@gmail.com' ||
-        cleanEmail.includes('ltf.tlht') ||
-        cleanEmail.includes('ltftlht') ||
-        cleanEmail === 'nhatkylomdom@gmail.com' || 
-        cleanEmail.includes('nhatkylomdom') ||
-        cleanEmail.includes('dangtai') ||
-        cleanEmail.includes('hoangngocdangtai') ||
-        cleanEmail.startsWith('ltftlht');
+      // Chỉ chấp nhận phiên do Supabase Auth cấp; sai mật khẩu là dừng, không tự dựng phiên
+      const { data, error } = mode === 'signin'
+        ? await signInWithEmailPassword(cleanEmail, cleanPass)
+        : await signUpWithEmailPassword(cleanEmail, cleanPass);
 
-      let authUserResult: any = null;
-
-      if (mode === 'signin') {
-        const { data, error } = await signInWithEmailPassword(cleanEmail, cleanPass);
-        if (error) {
-          // Nếu tài khoản chưa tạo trên Supabase, tự động đăng ký bảo mật
-          const { data: signUpData, error: signUpErr } = await signUpWithEmailPassword(cleanEmail, cleanPass);
-          if (!signUpErr && signUpData?.user) {
-            authUserResult = signUpData.user;
-          } else {
-            // Cấp phiên bảo mật riêng gắn với mật khẩu của khách hàng
-            const hashId = 'user_' + btoa(cleanEmail).replace(/[^a-zA-Z0-9]/g, '').substring(0, 16);
-            authUserResult = {
-              id: hashId,
-              email: cleanEmail,
-              user_metadata: { user_name: cleanEmail.split('@')[0], is_admin: isAdminCandidate }
-            };
-          }
-        } else if (data?.user) {
-          authUserResult = data.user;
-        }
-      } else {
-        const { data, error } = await signUpWithEmailPassword(cleanEmail, cleanPass);
-        if (error) {
-          const hashId = 'user_' + btoa(cleanEmail).replace(/[^a-zA-Z0-9]/g, '').substring(0, 16);
-          authUserResult = {
-            id: hashId,
-            email: cleanEmail,
-            user_metadata: { user_name: cleanEmail.split('@')[0], is_admin: isAdminCandidate }
-          };
-        } else if (data?.user) {
-          authUserResult = data.user;
-        }
+      if (error) {
+        setErrorMsg(
+          mode === 'signin'
+            ? (language === 'vi' ? 'Sai email hoặc mật khẩu.' : 'Invalid email or password.')
+            : (error.message || (language === 'vi' ? 'Không thể đăng ký tài khoản.' : 'Sign up failed.'))
+        );
+        return;
       }
 
-      if (isAdminCandidate || checkIsAdmin(authUserResult)) {
-        localStorage.setItem('deal_admin_session', JSON.stringify(authUserResult));
-        localStorage.removeItem('deal_user_session');
-        setSuccessMsg(language === 'vi' ? 'Xác thực Quản trị viên thành công! Đang vào hệ thống...' : 'Admin authenticated!');
-      } else {
-        localStorage.setItem('deal_user_session', JSON.stringify(authUserResult));
-        localStorage.removeItem('deal_admin_session');
-        setSuccessMsg(language === 'vi' ? 'Đăng nhập thành công! Đang vào không gian của bạn...' : 'Signed in successfully!');
+      if (!data?.session || !data.user) {
+        // Supabase bật xác nhận email: user phải bấm link trong hộp thư trước khi đăng nhập
+        setSuccessMsg(language === 'vi' ? 'Đã gửi email xác nhận. Vui lòng mở hộp thư để kích hoạt.' : 'Confirmation email sent.');
+        return;
       }
+
+      const authUserResult = data.user;
+      setSuccessMsg(
+        checkIsAdmin(authUserResult)
+          ? (language === 'vi' ? 'Xác thực Quản trị viên thành công! Đang vào hệ thống...' : 'Admin authenticated!')
+          : (language === 'vi' ? 'Đăng nhập thành công! Đang vào không gian của bạn...' : 'Signed in successfully!')
+      );
 
       setTimeout(() => {
         onLoginSuccess(authUserResult);

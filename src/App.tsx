@@ -400,13 +400,7 @@ export default function App() {
   const [isConnectEAOpen, setIsConnectEAOpen] = useState(false);
   const [authLoading, setAuthLoading] = useState<boolean>(true);
   const [authUser, setAuthUser] = useState<any>(null);
-  const [adminPinInput, setAdminPinInput] = useState<string>('');
-  const [adminPinError, setAdminPinError] = useState<string | null>(null);
-  const [adminClaimed, setAdminClaimed] = useState<boolean>(false);
-
-  const isAdmin = useMemo(() => {
-    return checkIsAdmin(authUser) || adminClaimed;
-  }, [authUser, adminClaimed]);
+  const isAdmin = useMemo(() => checkIsAdmin(authUser), [authUser]);
 
   // Quản lý Bản Quyền Thương Mại (Commercial License Gate)
   const [isLicenseManagerOpen, setIsLicenseManagerOpen] = useState(false);
@@ -449,26 +443,10 @@ export default function App() {
   useEffect(() => {
     let isMounted = true;
 
-    // Kiểm tra phiên đăng nhập đã lưu trong máy (Admin hoặc Trader)
+    // Phiên đăng nhập chỉ lấy từ Supabase Auth (xác minh với máy chủ), xóa phiên tự dựng cũ còn sót
     try {
-      const savedAdmin = localStorage.getItem('deal_admin_session');
-      if (savedAdmin) {
-        const parsed = JSON.parse(savedAdmin);
-        if (parsed && parsed.email) {
-          setAuthUser(parsed);
-          setAuthLoading(false);
-          return;
-        }
-      }
-      const savedUser = localStorage.getItem('deal_user_session');
-      if (savedUser) {
-        const parsed = JSON.parse(savedUser);
-        if (parsed && (parsed.email || parsed.id)) {
-          setAuthUser(parsed);
-          setAuthLoading(false);
-          return;
-        }
-      }
+      localStorage.removeItem('deal_admin_session');
+      localStorage.removeItem('deal_user_session');
     } catch {}
 
     getAuthUser().then(user => {
@@ -605,8 +583,8 @@ export default function App() {
       // Phân tách tài khoản đa người dùng thương mại (Multi-tenant Account Isolation)
       if (!isAdmin) {
         const allowedList = licenseCheck?.allowedAccountsList || [];
+        // Khách chỉ thấy đúng các tài khoản MT5 được cấp phép; danh sách trống = không thấy gì
         const filteredDetected = (detectedAccounts || []).filter(d => {
-          if (allowedList.length === 0) return true;
           const cleanId = String(d.id).replace(/^acc-/, '').trim();
           return allowedList.includes(cleanId);
         });
