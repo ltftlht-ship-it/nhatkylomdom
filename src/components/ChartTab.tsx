@@ -206,6 +206,9 @@ export const ChartTab: React.FC<ChartTabProps> = ({
     return sortedTrades[0]?.symbol?.toUpperCase().trim() || 'XAUUSD';
   });
 
+  const selectedTicketRef = useRef<string | null>(null);
+  const lastFittedTradeRef = useRef<string | null>(null);
+
   // Lệnh đang được chọn để cắm cờ
   const [activeTrade, setActiveTrade] = useState<TradeRow | null>(() => {
     if (selectedTradeId) {
@@ -216,14 +219,38 @@ export const ChartTab: React.FC<ChartTabProps> = ({
   });
 
   useEffect(() => {
+    // 1. Giữ nguyên lệnh Thầy vừa click chọn
+    if (selectedTicketRef.current) {
+      const found = sortedTrades.find(t => 
+        String(t.ticket) === selectedTicketRef.current || 
+        String(t.id) === selectedTicketRef.current
+      );
+      if (found) {
+        setActiveTrade(found);
+        return;
+      }
+    }
+
+    // 2. Nếu có lệnh truyền từ tab Lịch sử sang
     if (selectedTradeId) {
-      const found = trades.find(t => String(t.id) === String(selectedTradeId) || String(t.ticket) === String(selectedTradeId));
+      const found = sortedTrades.find(t => 
+        String(t.id) === String(selectedTradeId) || 
+        String(t.ticket) === String(selectedTradeId)
+      );
       if (found) {
         setActiveTrade(found);
         if (found.symbol) setSelectedSymbol(found.symbol.toUpperCase().trim());
+        return;
       }
     }
-  }, [selectedTradeId, trades]);
+
+    // 3. Mặc định Lệnh 1 nếu chưa chọn gì
+    if (sortedTrades.length > 0 && !activeTrade) {
+      const firstTrade = sortedTrades[0];
+      setActiveTrade(firstTrade);
+      if (firstTrade.symbol) setSelectedSymbol(firstTrade.symbol.toUpperCase().trim());
+    }
+  }, [selectedTradeId, sortedTrades, activeTrade]);
 
   // Khung thời gian cho chế độ cắm cờ MT5
   const [timeframeMinutes, setTimeframeMinutes] = useState<number>(15);
@@ -642,9 +669,10 @@ export const ChartTab: React.FC<ChartTabProps> = ({
     setIsLoadingCandles(true);
 
     try {
-      const targetSymbol = selectedSymbol || 'XAUUSD';
-      const openSec = activeTrade && (activeTrade.symbol || '').toUpperCase().trim() === targetSymbol.toUpperCase().trim()
-        ? parseTradeTimeToDisplayUnixSec(activeTrade.open_time)
+      const relevantTrade = activeTrade || sortedTrades[0];
+      const targetSymbol = (relevantTrade?.symbol || selectedSymbol || 'XAUUSD').toUpperCase().trim();
+      const openSec = relevantTrade?.open_time
+        ? parseTradeTimeToDisplayUnixSec(relevantTrade.open_time)
         : Math.floor(Date.now() / 1000);
 
       const realCandles = await fetchRealMarketCandles(
@@ -671,12 +699,9 @@ export const ChartTab: React.FC<ChartTabProps> = ({
 
       seriesInstanceRef.current.setData(formattedData);
 
-      // CẮM CỜ MŨI TÊN VÀO NẾN
-      const relevantTrade = activeTrade && (activeTrade.symbol || '').toUpperCase().trim() === targetSymbol.toUpperCase().trim()
-        ? activeTrade
-        : sortedTrades.find(t => (t.symbol || '').toUpperCase().trim() === targetSymbol.toUpperCase().trim());
-
+      // CẮM CỜ MŨI TÊN VÀO NẾN (CHUẨN LIGHTWEIGHT CHARTS)
       const markers: any[] = [];
+      let closestEntryCandleTime = formattedData[0].time;
 
       if (relevantTrade) {
         const isBuy = relevantTrade.type === 'BUY';
@@ -687,7 +712,6 @@ export const ChartTab: React.FC<ChartTabProps> = ({
         const pnlText = pnl >= 0 ? `+${pnl.toFixed(2)}$` : `${pnl.toFixed(2)}$`;
 
         const tradeOpenSec = parseTradeTimeToDisplayUnixSec(relevantTrade.open_time);
-        let closestEntryCandleTime = formattedData[0].time;
         let minEntryDiff = Infinity;
 
         for (const candle of formattedData) {
@@ -703,7 +727,7 @@ export const ChartTab: React.FC<ChartTabProps> = ({
           position: isBuy ? 'belowBar' : 'aboveBar',
           color: isBuy ? '#4a6152' : '#825249',
           shape: isBuy ? 'arrowUp' : 'arrowDown',
-          text: `BUY ${volume} @ ${entryPrice}`,
+          text: `BUY ${volume}L @ ${entryPrice}`,
           size: 2,
         });
 
@@ -729,6 +753,23 @@ export const ChartTab: React.FC<ChartTabProps> = ({
             size: 2,
           });
         }
+
+        // Tự động căn khung nến vào vị trí lệnh chỉ 1 lần khi đổi lệnh, không auto-reset khi người dùng đang zoom
+        const currentTradeKey = String(relevantTrade.ticket || relevantTrade.id || '');
+        const isNewTrade = lastFittedTradeRef.current !== currentTradeKey;
+
+        if (isNewTrade) {
+          lastFittedTradeRef.current = currentTradeKey;
+          const entryIdx = formattedData.findIndex(c => Number(c.time) === Number(closestEntryCandleTime));
+          if (entryIdx >= 0 && chartInstanceRef.current) {
+            chartInstanceRef.current.timeScale().setVisibleLogicalRange({
+              from: Math.max(0, entryIdx - 40),
+              to: Math.min(formattedData.length - 1, entryIdx + 60)
+            });
+          } else if (chartInstanceRef.current) {
+            chartInstanceRef.current.timeScale().fitContent();
+          }
+        }
       }
 
       if (markersPrimitiveRef.current) {
@@ -737,7 +778,6 @@ export const ChartTab: React.FC<ChartTabProps> = ({
         markersPrimitiveRef.current = createSeriesMarkers(seriesInstanceRef.current, markers);
       }
 
-      chartInstanceRef.current.timeScale().fitContent();
       setTimeout(() => {
         redrawShapesRef.current?.();
       }, 100);
@@ -747,7 +787,15 @@ export const ChartTab: React.FC<ChartTabProps> = ({
     } finally {
       setIsLoadingCandles(false);
     }
-  }, [chartMode, selectedSymbol, activeTrade, sortedTrades, timeframeMinutes, effectiveOffset, parseTradeTimeToDisplayUnixSec]);
+  }, [
+    chartMode,
+    selectedSymbol,
+    activeTrade,
+    sortedTrades,
+    timeframeMinutes,
+    effectiveOffset,
+    parseTradeTimeToDisplayUnixSec
+  ]);
 
   useEffect(() => {
     if (chartMode === 'execution') {
@@ -1111,8 +1159,10 @@ export const ChartTab: React.FC<ChartTabProps> = ({
               </div>
             ) : (
               filteredTrades.map((tr) => {
-                const isSelected = (activeTrade && (activeTrade.ticket === tr.ticket || activeTrade.id === tr.id)) ||
-                                   (tr.symbol && tr.symbol.toUpperCase().trim() === selectedSymbol);
+                const isSelected = Boolean(activeTrade && (
+                  String(activeTrade.ticket) === String(tr.ticket) || 
+                  String(activeTrade.id) === String(tr.id)
+                ));
                 const isBuy = tr.type === 'BUY';
                 const pnl = Number(tr.pnl) || 0;
                 const isWin = pnl > 0;
@@ -1122,6 +1172,8 @@ export const ChartTab: React.FC<ChartTabProps> = ({
                   <div
                     key={tr.ticket || tr.id}
                     onClick={() => {
+                      selectedTicketRef.current = String(tr.ticket || tr.id);
+                      lastFittedTradeRef.current = null;
                       setActiveTrade(tr);
                       if (tr.symbol) setSelectedSymbol(tr.symbol.toUpperCase().trim());
                       if (onSelectTrade) onSelectTrade(tr);

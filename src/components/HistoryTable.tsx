@@ -220,7 +220,25 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
   // Gom cụm các lệnh con thành Master Group (theo position_id)
   const allTradeGroups = useMemo(() => {
     const closedGroups = groupTradesByPosition(closedTrades);
-    return [...pendingTradeGroups, ...closedGroups];
+    const closedTicketSet = new Set<string>();
+    closedGroups.forEach(g => {
+      if (g.ticket) closedTicketSet.add(String(g.ticket).trim());
+      if (g.position_id) closedTicketSet.add(String(g.position_id).trim());
+      g.trades.forEach(t => {
+        if (t.ticket) closedTicketSet.add(String(t.ticket).trim());
+        if (t.position_id) closedTicketSet.add(String(t.position_id).trim());
+      });
+    });
+
+    const activePendingGroups = pendingTradeGroups.filter(p => {
+      const t = String(p.ticket || '').trim();
+      const pos = String(p.position_id || '').replace(/^pending-/, '').trim();
+      if (t && closedTicketSet.has(t)) return false;
+      if (pos && closedTicketSet.has(pos)) return false;
+      return true;
+    });
+
+    return [...activePendingGroups, ...closedGroups];
   }, [closedTrades, pendingTradeGroups]);
 
   // Dynamic available symbols

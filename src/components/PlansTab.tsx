@@ -705,10 +705,10 @@ export const PlansTab: React.FC<PlansTabProps> = ({
                   {/* CHECKLIST LỖI TÂM LÝ */}
                   <div className="bg-white rounded-xl border border-[var(--border-main)] p-3.5 shadow-xs flex flex-col gap-2">
                     <div className="flex items-center justify-between pb-2 border-b border-[var(--border-main)] text-xs">
-                      <span className="font-bold text-[#1d1b17] uppercase tracking-wider">
+                      <span className="font-bold text-[var(--text-primary)] uppercase tracking-wider">
                         LỖI TÂM LÝ & SAI LẦM
                       </span>
-                      <span className="font-mono text-[11px] font-bold text-rose-600 px-2 py-0.5 rounded bg-rose-500/10 border border-rose-500/30">
+                      <span className="font-mono text-[11px] font-medium text-[var(--text-primary)] px-2 py-0.5 rounded bg-[var(--bg-subtle)] border border-[var(--border-main)]">
                         {selectedPsychologyIds.length} lỗi
                       </span>
                     </div>
@@ -732,7 +732,7 @@ export const PlansTab: React.FC<PlansTabProps> = ({
                               </div>
                               <span className="truncate leading-snug">{item.label}</span>
                             </div>
-                            <span className="font-mono text-[10px] text-rose-500 px-1.5 py-0.2 rounded bg-[var(--bg-card)] border border-[var(--border-main)] shrink-0">
+                            <span className="font-mono text-[10px] text-[var(--text-muted)] px-1.5 py-0.2 rounded bg-[var(--bg-card)] border border-[var(--border-main)] shrink-0">
                               -{item.penalty_points} pts
                             </span>
                           </button>
@@ -842,7 +842,7 @@ export const PlansTab: React.FC<PlansTabProps> = ({
                     disabled={isSubmitting}
                     className="px-6 py-2.5 rounded-xl bg-[#1d1b17] hover:bg-[#2b2721] text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Check className="w-4 h-4 text-emerald-400 stroke-[3]" />
+                    <Check className="w-4 h-4 text-white stroke-[2.5]" />
                     <span>
                       {isSubmitting ? 'Đang Lưu...' : selectedPlanId ? 'CẬP NHẬT KẾ HOẠCH' : 'LƯU KẾ HOẠCH GIAO DỊCH'}
                     </span>
@@ -865,7 +865,7 @@ export const PlansTab: React.FC<PlansTabProps> = ({
             {/* HEADER DANH SÁCH + TÌM KIẾM + LỌC */}
             <div className="p-3.5 border-b border-[var(--border-main)] flex flex-col space-y-2.5 bg-white/50 shrink-0">
               <div className="flex items-center justify-between gap-2">
-                <span className="font-bold text-[#1d1b17] text-xs uppercase tracking-wider">
+                <span className="font-bold text-[var(--text-primary)] text-xs uppercase tracking-wider">
                   DANH SÁCH KẾ HOẠCH LỆNH ({filteredPlans.length})
                 </span>
                 <div className="flex items-center clay-well p-0.5 rounded-full border border-[var(--border-main)]/50">
@@ -930,10 +930,10 @@ export const PlansTab: React.FC<PlansTabProps> = ({
                               #{plan.account_id}
                             </span>
                           )}
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase border ${
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-medium uppercase border ${
                             isExecuted
-                              ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30'
-                              : 'bg-amber-500/10 text-amber-700 border-amber-500/30'
+                              ? 'border-[#4a6152]/40 bg-[#4a6152]/10 text-[var(--text-primary)]'
+                              : 'border-[var(--border-main)] bg-[var(--bg-subtle)] text-[var(--text-muted)]'
                           }`}>
                             {isExecuted ? 'EXECUTED' : 'PENDING'}
                           </span>

@@ -4551,15 +4551,15 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                             if (isProfit) {
                               const ratio = Math.min(1, Math.abs(cell.pnl) / (intradayHourlyMatrix.maxAbsPnl || 1));
                               bgClass = ratio > 0.4 
-                                ? 'bg-emerald-500/40 border-emerald-500/60 text-emerald-200 shadow-[0_0_8px_rgba(16,185,129,0.25)]' 
-                                : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300';
+                                ? 'bg-emerald-100 border-emerald-300 text-[#4a6152] font-bold' 
+                                : 'bg-emerald-50 border-emerald-200 text-[#4a6152]';
                             } else if (isLoss) {
                               const ratio = Math.min(1, Math.abs(cell.pnl) / (intradayHourlyMatrix.maxAbsPnl || 1));
                               bgClass = ratio > 0.4 
-                                ? 'bg-rose-500/40 border-rose-500/60 text-rose-200 shadow-[0_0_8px_rgba(244,63,94,0.25)]' 
-                                : 'bg-rose-500/20 border-rose-500/40 text-rose-300';
+                                ? 'bg-rose-100 border-rose-300 text-[#825249] font-bold' 
+                                : 'bg-rose-50 border-rose-200 text-[#825249]';
                             } else {
-                              bgClass = 'bg-slate-700/30 border-slate-600/40 text-[#424843]';
+                              bgClass = 'bg-[#ede7df] border-[#d8d0c5] text-[var(--text-muted)]';
                             }
                           }
 
@@ -4664,15 +4664,15 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                   key={m.monthIdx}
                   className={`p-1.5 rounded-lg border text-center transition-all ${
                     m.status === 'WIN' 
-                      ? 'bg-emerald-500/10 border-emerald-500/30 shadow-[0_0_6px_rgba(16,185,129,0.1)]' 
+                      ? 'bg-emerald-50 border-emerald-200' 
                       : m.status === 'LOSS'
-                        ? 'bg-rose-500/10 border-rose-500/30 shadow-[0_0_6px_rgba(244,63,94,0.1)]'
-                        : 'bg-[#ede7df] border-[#e8e2da]/50 opacity-60'
+                        ? 'bg-rose-50 border-rose-200'
+                        : 'bg-[#ede7df] border-[#d8d0c5] opacity-60'
                   }`}
                 >
                   <span className="text-[9px] text-[#737973] uppercase font-semibold font-mono block">{m.name}</span>
                   <div className={`font-mono text-[11px] font-bold mt-0.5 truncate ${
-                    m.pnl > 0 ? 'text-emerald-400' : m.pnl < 0 ? 'text-rose-400' : 'text-[#737973]'
+                    m.pnl > 0 ? 'text-[#4a6152]' : m.pnl < 0 ? 'text-[#825249]' : 'text-[#737973]'
                   }`}>
                     {m.count > 0 ? (m.pnl >= 0 ? `+$${m.pnl.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : `-$${Math.abs(m.pnl).toLocaleString('en-US', { maximumFractionDigits: 0 })}`) : '$0'}
                   </div>
@@ -4822,8 +4822,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
             </div>
 
             <div className="grid grid-cols-2 gap-2 my-auto">
-              <div className="p-3 rounded-xl bg-[#ede7df] border border-emerald-500/20 space-y-1">
-                <span className="text-[10px] font-bold text-emerald-400 uppercase">BUY (LONG)</span>
+              <div className="p-3 rounded-xl bg-[#ede7df] border border-[#d8d0c5] space-y-1">
+                <span className="text-[10px] font-bold text-[var(--text-primary)] uppercase">BUY (LONG)</span>
                 <div className={`text-base font-bold font-mono ${instrumentData.longShort.buy.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                   {instrumentData.longShort.buy.pnl >= 0 ? '+' : ''}${instrumentData.longShort.buy.pnl.toFixed(0)}
                 </div>
@@ -4835,8 +4835,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-[#ede7df] border border-rose-500/20 space-y-1">
-                <span className="text-[10px] font-bold text-rose-400 uppercase">SELL (SHORT)</span>
+              <div className="p-3 rounded-xl bg-[#ede7df] border border-[#d8d0c5] space-y-1">
+                <span className="text-[10px] font-bold text-[var(--text-primary)] uppercase">SELL (SHORT)</span>
                 <div className={`text-base font-bold font-mono ${instrumentData.longShort.sell.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                   {instrumentData.longShort.sell.pnl >= 0 ? '+' : ''}${instrumentData.longShort.sell.pnl.toFixed(0)}
                 </div>
@@ -4947,8 +4947,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                       onClick={() => setCustomWhatIfRR(rVal)}
                       className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold transition-all cursor-pointer ${
                         customWhatIfRR === rVal 
-                          ? 'bg-sky-500 text-[#1d1b17] shadow-xs' 
-                          : 'text-[#737973] hover:text-[#1d1b17] hover:bg-[#e8e2da]'
+                          ? 'bg-white text-[#1d1b17] font-bold border border-[#d8d0c5] shadow-xs' 
+                          : 'text-[#737973] hover:text-[#4a6152] hover:bg-[#e8e2da]'
                       }`}
                     >
                       {rVal}R
@@ -4966,7 +4966,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                         const val = parseFloat(e.target.value);
                         if (!isNaN(val) && val > 0) setCustomWhatIfRR(val);
                       }}
-                      className="w-12 px-1 py-0.5 text-[10px] font-mono font-bold bg-[#0d1117] border border-[#e8e2da] rounded text-[#1d1b17] text-center focus:outline-hidden focus:border-sky-500"
+                      className="w-12 px-1 py-0.5 text-[10px] font-mono font-bold bg-white border border-[#d8d0c5] rounded text-[#1d1b17] text-center focus:outline-hidden focus:border-[#4a6152]"
                       title="Nhập số R tùy chỉnh"
                     />
                     <span className="text-[10px] font-mono text-[#737973] ml-0.5">R</span>
@@ -5050,7 +5050,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
 
             <div className="flex items-center gap-2 flex-wrap text-xs font-mono">
               {/* Bộ chọn mục tiêu R cho MFE: 1R, 2R, 3R */}
-              <div className="flex items-center gap-1.5 bg-[#ede7df] px-2.5 py-1 rounded-lg border border-[#38414e] shadow-xs">
+              <div className="flex items-center gap-1.5 bg-[#ede7df] px-2.5 py-1 rounded-lg border border-[#e8e2da] shadow-xs">
                 <span className="text-[11px] text-[#1d1b17] font-mono font-bold whitespace-nowrap">
                   {language === 'vi' ? 'Mốc R MFE:' : 'Target R:'}
                 </span>
@@ -5062,8 +5062,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                       onClick={() => setCustomMfeRR(rVal)}
                       className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold transition-all cursor-pointer ${
                         customMfeRR === rVal 
-                          ? 'bg-sky-500 text-[#1d1b17] shadow-xs' 
-                          : 'text-[#737973] hover:text-[#1d1b17] hover:bg-[#e8e2da]'
+                          ? 'bg-white text-[#1d1b17] font-bold border border-[#d8d0c5] shadow-xs' 
+                          : 'text-[#737973] hover:text-[#4a6152] hover:bg-[#e8e2da]'
                       }`}
                     >
                       {rVal}R
@@ -5081,7 +5081,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                         const val = parseFloat(e.target.value);
                         if (!isNaN(val) && val > 0) setCustomMfeRR(val);
                       }}
-                      className="w-12 px-1 py-0.5 text-[10px] font-mono font-bold bg-[#0d1117] border border-[#e8e2da] rounded text-[#1d1b17] text-center focus:outline-hidden focus:border-sky-500"
+                      className="w-12 px-1 py-0.5 text-[10px] font-mono font-bold bg-white border border-[#d8d0c5] rounded text-[#1d1b17] text-center focus:outline-hidden focus:border-[#4a6152]"
                       title={language === 'vi' ? 'Nhập số R tùy chỉnh' : 'Custom R multiple'}
                     />
                   </div>
@@ -5126,8 +5126,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
               </p>
             </div>
 
-            <div className="p-3 bg-[#ede7df] rounded-xl border border-rose-500/25 space-y-1">
-              <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider">
+            <div className="p-3 bg-[#ede7df] rounded-xl border border-[#d8d0c5] space-y-1">
+              <span className="text-[10px] font-bold text-[var(--text-primary)] uppercase tracking-wider">
                 {language === 'vi' ? 'Lợi nhuận để tuột (Left on table)' : 'Left on Table Drain'}
               </span>
               <div className="text-lg font-bold font-mono text-rose-400">
@@ -5156,7 +5156,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                 <span className="text-[10px] font-bold text-[#1d1b17] uppercase tracking-wider">
                   {language === 'vi' ? 'Đè Nén Lệnh Thắng (MAE)' : 'MAE On Wins'}
                 </span>
-                <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20 font-bold">
+                <span className="text-[9px] font-mono text-[#4a6152] bg-[#e8e2da] px-1.5 py-0.2 rounded border border-[#d8d0c5] font-bold">
                   {mfeMaeData.maeWinStats.pctUnder050R}% ≤ 0.5R
                 </span>
               </div>
@@ -5228,42 +5228,42 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                 <span className="font-bold text-[#1d1b17] text-xs tracking-wider uppercase font-sans">
                   {language === 'vi' ? 'Bảng Bóc Tách MFE & MAE Từng Lệnh' : 'Trade-by-Trade MFE & MAE Breakdown'}
                 </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-[#424843]">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#ede7df] border border-[#d8d0c5] text-[#1d1b17]">
                   {mfeMaeData.tradeDetails.length} {language === 'vi' ? 'lệnh' : 'trades'}
                 </span>
               </div>
               <div className="flex items-center gap-2 text-[10px] font-mono text-[#737973]">
                 <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-xs bg-emerald-500/30 border border-emerald-500/50" />
+                  <span className="w-2 h-2 rounded-xs bg-emerald-200 border border-emerald-400" />
                   <span>{language === 'vi' ? 'MFE thật từ EA' : 'Real EA MFE'}</span>
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-xs bg-slate-700/50 border border-slate-600/50" />
+                  <span className="w-2 h-2 rounded-xs bg-[#d8d0c5] border border-[#737973]" />
                   <span>{language === 'vi' ? 'Mốc PnL đóng' : 'Closed Baseline'}</span>
                 </span>
               </div>
             </div>
 
-            {/* Bảng dạng cuộn phong cách Fintech tối giản */}
-            <div className="overflow-x-auto rounded-lg border border-[#e8e2da]/80 bg-[#ede7df]/90 shadow-inner max-h-80 overflow-y-auto custom-scrollbar">
-              <table className="w-full text-left border-collapse text-[11px] font-mono">
-                <thead className="sticky top-0 bg-[#12161c] border-b border-[#e8e2da] text-[#737973] text-[10px] uppercase font-bold tracking-wider z-20">
+            {/* Bảng dạng cuộn chuẩn Tab History */}
+            <div className="overflow-x-auto rounded-2xl border border-[var(--border-main)] bg-white shadow-xs max-h-80 overflow-y-auto">
+              <table className="w-full text-left border-collapse text-xs font-sans">
+                <thead className="sticky top-0 bg-white border-b border-[var(--border-main)] text-[var(--text-muted)] text-[11px] uppercase font-medium tracking-wider z-20">
                   <tr>
-                    <th className="py-2 px-2.5 text-center w-12">#</th>
-                    <th className="py-2 px-2 text-left">{language === 'vi' ? 'Vé / Lệnh' : 'Ticket'}</th>
-                    <th className="py-2 px-2 text-left">{language === 'vi' ? 'Cặp / Loại' : 'Symbol / Type'}</th>
-                    <th className="py-2 px-2 text-right">{language === 'vi' ? 'Vào / SL' : 'Entry / SL'}</th>
-                    <th className="py-2 px-2 text-right">{language === 'vi' ? 'Giá Đóng' : 'Close Price'}</th>
-                    <th className="py-2 px-2 text-right">{language === 'vi' ? 'PnL Thực Nhận' : 'Realized PnL'}</th>
-                    <th className="py-2 px-2 text-right text-[#1d1b17]">{language === 'vi' ? 'MFE Đỉnh ($ / R)' : 'MFE Peak ($ / R)'}</th>
-                    <th className="py-2 px-2 text-right text-[#1d1b17]">{language === 'vi' ? 'MAE Đáy ($ / R)' : 'MAE Low ($ / R)'}</th>
-                    <th className="py-2 px-2.5 text-right text-rose-300">{language === 'vi' ? 'Để Tuột Mất' : 'Left on Table'}</th>
+                    <th className="py-2.5 px-3 text-center w-12 font-medium">#</th>
+                    <th className="py-2.5 px-2 text-left font-medium">{language === 'vi' ? 'Vé / Lệnh' : 'Ticket'}</th>
+                    <th className="py-2.5 px-2 text-left font-medium">{language === 'vi' ? 'Cặp / Loại' : 'Symbol / Type'}</th>
+                    <th className="py-2.5 px-2 text-right font-medium">{language === 'vi' ? 'Vào / SL' : 'Entry / SL'}</th>
+                    <th className="py-2.5 px-2 text-right font-medium">{language === 'vi' ? 'Giá Đóng' : 'Close Price'}</th>
+                    <th className="py-2.5 px-2 text-right font-medium">{language === 'vi' ? 'PnL Thực Nhận' : 'Realized PnL'}</th>
+                    <th className="py-2.5 px-2 text-right font-medium">{language === 'vi' ? 'MFE Đỉnh ($ / R)' : 'MFE Peak ($ / R)'}</th>
+                    <th className="py-2.5 px-2 text-right font-medium">{language === 'vi' ? 'MAE Đáy ($ / R)' : 'MAE Low ($ / R)'}</th>
+                    <th className="py-2.5 px-3 text-right font-medium">{language === 'vi' ? 'Để Tuột Mất' : 'Left on Table'}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#30363d]/40 text-[#1d1b17]">
+                <tbody className="divide-y divide-[var(--border-subtle)] text-[var(--text-primary)] text-xs bg-white">
                   {mfeMaeData.tradeDetails.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="py-6 text-center text-[#737973] font-sans text-xs">
+                      <td colSpan={9} className="py-12 text-center text-[var(--text-muted)] font-sans text-xs">
                         {language === 'vi' ? 'Không có dữ liệu lệnh đã đóng' : 'No closed trades recorded'}
                       </td>
                     </tr>
@@ -5276,92 +5276,88 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                       return (
                         <tr 
                           key={tr.ticket || idx} 
-                          className="hover:bg-[#1f2631]/80 transition-colors group"
+                          className="h-[44px] hover:bg-[var(--table-row-hover)] text-[var(--text-primary)] transition-colors"
                         >
                           {/* Index */}
-                          <td className="py-1.5 px-2.5 text-center text-[#737973] font-bold">
+                          <td className="py-2 px-3 text-center text-[var(--text-muted)] font-mono text-[11px]">
                             {idx + 1}
                           </td>
 
                           {/* Ticket */}
-                          <td className="py-1.5 px-2 text-left text-[#424843] font-semibold truncate max-w-[90px]">
-                            {tr.ticket}
+                          <td className="py-2 px-2 text-left font-mono font-medium text-xs text-[var(--text-primary)] truncate max-w-[90px]">
+                            #{tr.ticket}
                           </td>
 
                           {/* Symbol & Type */}
-                          <td className="py-1.5 px-2 text-left">
+                          <td className="py-2 px-2 text-left">
                             <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-[#1d1b17]">{tr.symbol}</span>
-                              <span className={`px-1 py-0.2 rounded text-[9px] font-bold ${
+                              <span className="font-bold text-[var(--text-primary)] text-xs">{tr.symbol}</span>
+                              <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold border ${
                                 isBuy 
-                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
-                                  : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                  ? 'bg-[#4a6152]/10 text-[var(--color-win)] border-[#4a6152]/30' 
+                                  : 'bg-[#825249]/10 text-[var(--color-loss)] border-[#825249]/30'
                               }`}>
                                 {tr.type}
                               </span>
-                              <span className="text-[10px] text-[#737973] font-normal">{tr.volume}L</span>
+                              <span className="text-[10px] text-[var(--text-muted)] font-mono">{tr.volume}L</span>
                             </div>
                           </td>
 
                           {/* Entry / SL */}
-                          <td className="py-1.5 px-2 text-right font-mono text-[10px] text-[#424843]">
+                          <td className="py-2 px-2 text-right font-mono text-xs text-[var(--text-primary)]">
                             <div>{tr.openPrice > 0 ? tr.openPrice : '-'}</div>
-                            <div className="text-[#737973] text-[9px]">SL: {tr.initialSl > 0 ? tr.initialSl : 'None'}</div>
+                            <div className="text-[var(--text-muted)] text-[10px]">SL: {tr.initialSl > 0 ? tr.initialSl : 'None'}</div>
                           </td>
 
                           {/* Close Price */}
-                          <td className="py-1.5 px-2 text-right font-mono text-[#424843] text-[10px]">
+                          <td className="py-2 px-2 text-right font-mono text-xs text-[var(--text-primary)]">
                             {tr.closePrice > 0 ? tr.closePrice : '-'}
                           </td>
 
                           {/* Realized PnL */}
-                          <td className="py-1.5 px-2 text-right font-bold font-mono">
-                            <span className={isWin ? 'text-emerald-400' : isLoss ? 'text-rose-400' : 'text-[#737973]'}>
+                          <td className="py-2 px-2 text-right font-mono font-medium text-xs">
+                            <span className={isWin ? 'text-[#4a6152]' : isLoss ? 'text-[#825249]' : 'text-[var(--text-muted)]'}>
                               {tr.net >= 0 ? '+' : ''}${tr.net.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
-                            <div className="text-[9px] text-[#737973] font-normal">
+                            <div className="text-[10px] text-[var(--text-muted)] font-normal">
                               {tr.risk1R > 0 ? `${(tr.net / tr.risk1R).toFixed(2)}R` : '-'}
                             </div>
                           </td>
 
                           {/* MFE ($ / R) & Giá đỉnh */}
-                          <td className="py-1.5 px-2 text-right font-mono">
-                            <div className="flex items-center justify-end gap-1">
-                              <span className="font-bold text-[#1d1b17]">
-                                +${tr.mfeUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </span>
+                          <td className="py-2 px-2 text-right font-mono text-xs">
+                            <div className="font-medium text-[var(--text-primary)]">
+                              +${tr.mfeUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </div>
-                            <div className="text-[9px] text-[#1d1b17]/80">
+                            <div className="text-[10px] text-[var(--text-muted)]">
                               {tr.mfeR > 0 ? `+${tr.mfeR}R` : '-'}
                               {tr.mfeDist > 0 && (
-                                <span className="text-[#737973] ml-1">({tr.mfeDist} giá)</span>
+                                <span className="text-[var(--text-muted)] ml-1">({tr.mfeDist} giá)</span>
                               )}
                             </div>
                           </td>
 
                           {/* MAE ($ / R) & Giá đáy */}
-                          <td className="py-1.5 px-2 text-right font-mono">
-                            <div className="flex items-center justify-end gap-1">
-                              <span className="font-bold text-[#1d1b17]">
-                                -${tr.maeUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </span>
+                          <td className="py-2 px-2 text-right font-mono text-xs">
+                            <div className="font-medium text-[var(--text-primary)]">
+                              -${tr.maeUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </div>
-                            <div className="text-[9px] text-[#1d1b17]/80">
+                            <div className="text-[10px] text-[var(--text-muted)]">
                               {tr.maeR > 0 ? `-${tr.maeR}R` : '-'}
                               {tr.maeDist > 0 && (
-                                <span className="text-[#737973] ml-1">({tr.maeDist} giá)</span>
+                                <span className="text-[var(--text-muted)] ml-1">({tr.maeDist} giá)</span>
                               )}
                             </div>
                           </td>
 
                           {/* Left on Table */}
-                          <td className="py-1.5 px-2.5 text-right font-mono font-bold">
+                          <td className="py-2 px-3 text-right font-mono text-xs">
                             {tr.leftOnTable > 0.05 ? (
-                              <span className="text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20 text-[10px]">
+                              <span className="text-[#825249] bg-[#825249]/10 px-1.5 py-0.5 rounded border border-[#825249]/30 text-[10px] font-semibold">
                                 -${tr.leftOnTable.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </span>
                             ) : (
-                              <span className="text-emerald-400 text-[10px]">
+                              <span className="text-[var(--text-muted)] text-[10px]">
                                 {language === 'vi' ? 'Đỉnh Chốt' : 'Peak Exit'}
                               </span>
                             )}
@@ -5388,26 +5384,24 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
             <button
               type="button"
               onClick={() => setScaleOutSubMode('CONTINUOUS_TRAILING')}
-              className={`px-3 py-1.5 rounded-md text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-md text-xs font-mono font-bold transition-all cursor-pointer ${
                 scaleOutSubMode === 'CONTINUOUS_TRAILING'
-                  ? 'bg-[#e8e2da] text-emerald-400 border border-emerald-500/30 shadow-xs'
-                  : 'text-[#737973] hover:text-[#1d1b17]'
+                  ? 'bg-white text-[#1d1b17] border border-[#d8d0c5] shadow-xs'
+                  : 'text-[#737973] hover:text-[#4a6152] hover:bg-[#e8e2da]'
               }`}
             >
-              <Zap className="w-3.5 h-3.5 text-emerald-400" />
               <span>{language === 'vi' ? 'Dịch SL Liên Tục (Không TP Cố Định)' : 'Continuous Trailing SL (No Fixed TP)'}</span>
             </button>
 
             <button
               type="button"
               onClick={() => setScaleOutSubMode('TIERS')}
-              className={`px-3 py-1.5 rounded-md text-xs font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-md text-xs font-mono font-bold transition-all cursor-pointer ${
                 scaleOutSubMode === 'TIERS'
-                  ? 'bg-[#e8e2da] text-[#1d1b17] border border-[#d8d0c5] shadow-xs'
-                  : 'text-[#737973] hover:text-[#1d1b17]'
+                  ? 'bg-white text-[#1d1b17] border border-[#d8d0c5] shadow-xs'
+                  : 'text-[#737973] hover:text-[#4a6152] hover:bg-[#e8e2da]'
               }`}
             >
-              <Scissors className="w-3.5 h-3.5 text-[#1d1b17]" />
               <span>{language === 'vi' ? 'Cắt Từng Phần Theo Mốc (Tiers)' : 'Scale-Out Tiers'}</span>
             </button>
           </div>
@@ -5418,49 +5412,43 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                ========================================================================= */
             <div className="space-y-4 relative z-10">
               {/* Header */}
-              <div className="flex items-center justify-between pb-3 border-b border-[#e8e2da] relative z-10 flex-wrap gap-2.5">
+              <div className="flex items-center justify-between pb-3 border-b border-[var(--border-main)] relative z-10 flex-wrap gap-2.5">
                 <div>
                   <div className="flex items-center gap-2">
-                    
-                    <span className="font-bold text-[#1d1b17] text-xs tracking-wider uppercase font-sans flex items-center gap-1.5">
-                      <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="font-bold text-[var(--text-primary)] text-xs tracking-wider uppercase font-sans">
                       {language === 'vi' 
                         ? 'Dịch SL Liên Tục Không TP Cố Định (Continuous Trailing Stop)' 
                         : 'Continuous Trailing SL Simulation'}
                     </span>
-                    <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--bg-subtle)] text-[var(--text-primary)] border border-[var(--border-main)]">
                       Step: {continuousTrailingData.stepR}R
                     </span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#ede7df] text-emerald-400 border border-[#e8e2da]">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--bg-subtle)] text-[var(--text-muted)] border border-[var(--border-main)]">
                       {continuousTrailingData.totalTrades} lệnh nến M5 thật
                     </span>
                     {continuousTrailingData.skippedTradesCount > 0 && (
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#ede7df] text-[#737973] border border-[#e8e2da]/60" title="Chỉ lấy lệnh đã có nến M5 từ MT5 để tính toán chuẩn xác">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--bg-subtle)] text-[var(--text-muted)] border border-[var(--border-main)]/60" title="Chỉ lấy lệnh đã có nến M5 từ MT5 để tính toán chuẩn xác">
                         (Bỏ qua {continuousTrailingData.skippedTradesCount} lệnh cũ chưa nạp nến)
                       </span>
                     )}
                   </div>
-                  <p className="text-[10px] text-[#737973] mt-0.5">
+                  <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
                     {language === 'vi' 
-                      ? `🚀 CHIẾN LƯỢC THẢ RÔNG TP: Kiểm toán 100% bằng từng cây nến M5 từ MT5. Cứ mỗi khi rướn thêm ${continuousTrailingData.stepR}R, SL nâng ${continuousTrailingData.stepR}R; râu nến giật ngược quét trúng SL là chốt ngay lập tức!` 
-                      : `🚀 100% Real M5 Candle Simulation: Ratchets SL per ${continuousTrailingData.stepR}R excursion. Pullback wick triggers immediate exit.`}
+                      ? `Chiến lược thả rông TP: Kiểm toán 100% bằng từng cây nến M5 từ MT5. Cứ mỗi khi rướn thêm ${continuousTrailingData.stepR}R, SL nâng ${continuousTrailingData.stepR}R; râu nến giật ngược quét trúng SL là chốt ngay lập tức.` 
+                      : `100% Real M5 Candle Simulation: Ratchets SL per ${continuousTrailingData.stepR}R excursion. Pullback wick triggers immediate exit.`}
                   </p>
                 </div>
 
                 <div className="flex items-center gap-2 text-xs font-mono flex-wrap">
-                  <span className="px-2.5 py-1 rounded bg-[#ede7df] border border-[#e8e2da] text-[#424843]">
-                    {language === 'vi' ? 'Vốn ban đầu:' : 'Initial:'} <strong className="text-[#1d1b17]">${initialBalance.toLocaleString()}</strong>
+                  <span className="px-2.5 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-main)] text-[var(--text-secondary)]">
+                    {language === 'vi' ? 'Vốn ban đầu:' : 'Initial:'} <strong className="text-[var(--text-primary)]">${initialBalance.toLocaleString()}</strong>
                   </span>
-                  <span className="px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
-                    {language === 'vi' ? 'Vốn giả lập:' : 'Simulated:'} <strong className="text-[#1d1b17]">${continuousTrailingData.finalSimulated.toLocaleString()}</strong>
+                  <span className="px-2.5 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-main)] text-[var(--text-secondary)]">
+                    {language === 'vi' ? 'Vốn giả lập:' : 'Simulated:'} <strong className="text-[var(--text-primary)]">${continuousTrailingData.finalSimulated.toLocaleString()}</strong>
                   </span>
-                  <span className={`px-2.5 py-1 rounded border ${
-                    continuousTrailingData.deltaTotal >= 0 
-                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' 
-                      : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
-                  }`}>
+                  <span className="px-2.5 py-1 rounded bg-[var(--bg-subtle)] border border-[var(--border-main)] text-[var(--text-secondary)]">
                     {language === 'vi' ? 'Chênh lệch vs Thực tế:' : 'Diff vs Actual:'}{' '}
-                    <strong className="font-bold">
+                    <strong className={`font-bold ${continuousTrailingData.deltaTotal >= 0 ? 'text-[#4a6152]' : 'text-[#825249]'}`}>
                       {continuousTrailingData.deltaTotal >= 0 ? '+' : ''}${continuousTrailingData.deltaTotal.toLocaleString()}
                     </strong>
                   </span>
@@ -5468,20 +5456,19 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
               </div>
 
               {/* THANH ĐIỀU CHỈNH THÔNG SỐ: BƯỚC R DỊCH SL + KIỂU KHÓA SL */}
-              <div className="p-3 bg-[#ede7df] rounded-xl border border-[#e8e2da] space-y-3">
+              <div className="p-3.5 bg-[var(--bg-card)] rounded-xl border border-[var(--border-main)] space-y-3">
                 <div className="flex items-center justify-between flex-wrap gap-3">
                   {/* Ô chỉnh Bước R (mặc định 1.5R, có thể thay đổi được) */}
                   <div className="flex items-center gap-3 flex-wrap">
-                    <span className="text-xs font-bold text-[#1d1b17] flex items-center gap-1.5">
-                      <Sliders className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-xs font-bold text-[var(--text-primary)]">
                       {language === 'vi' ? 'Bước Lợi Nhuận Dịch SL (Step R):' : 'Trailing Step (R):'}
                     </span>
 
-                    <div className="flex items-center gap-1 bg-[#0d1117] p-1 rounded-lg border border-[#e8e2da]">
+                    <div className="flex items-center gap-1 bg-[var(--bg-subtle)] p-0.5 rounded-lg border border-[var(--border-main)]">
                       <button
                         type="button"
                         onClick={() => setContinuousStepR(prev => Math.max(0.5, Number((prev - 0.5).toFixed(1))))}
-                        className="w-6 h-6 rounded flex items-center justify-center bg-[#ede7df] hover:bg-[#e8e2da] text-[#424843] font-bold cursor-pointer text-xs transition-colors"
+                        className="w-6 h-6 rounded flex items-center justify-center bg-white hover:bg-[var(--bg-subtle)] text-[var(--text-primary)] font-bold cursor-pointer text-xs transition-colors shadow-xs"
                       >
                         -
                       </button>
@@ -5495,13 +5482,13 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                           const v = parseFloat(e.target.value);
                           if (!isNaN(v) && v > 0) setContinuousStepR(v);
                         }}
-                        className="w-16 px-1 py-0.5 text-xs font-mono font-bold bg-transparent text-emerald-400 text-center focus:outline-hidden"
+                        className="w-14 px-1 py-0.5 text-xs font-mono font-bold bg-transparent text-[var(--text-primary)] text-center focus:outline-hidden"
                       />
-                      <span className="text-xs font-mono text-[#737973] mr-1">R</span>
+                      <span className="text-xs font-mono text-[var(--text-muted)] mr-1">R</span>
                       <button
                         type="button"
                         onClick={() => setContinuousStepR(prev => Number((prev + 0.5).toFixed(1)))}
-                        className="w-6 h-6 rounded flex items-center justify-center bg-[#ede7df] hover:bg-[#e8e2da] text-[#424843] font-bold cursor-pointer text-xs transition-colors"
+                        className="w-6 h-6 rounded flex items-center justify-center bg-white hover:bg-[var(--bg-subtle)] text-[var(--text-primary)] font-bold cursor-pointer text-xs transition-colors shadow-xs"
                       >
                         +
                       </button>
@@ -5514,10 +5501,10 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                           key={val}
                           type="button"
                           onClick={() => setContinuousStepR(val)}
-                          className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold transition-all cursor-pointer border ${
+                          className={`px-2 py-0.5 rounded text-[11px] font-mono font-semibold transition-all cursor-pointer border ${
                             continuousStepR === val
-                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-xs'
-                              : 'bg-[#0d1117] text-[#737973] border-[#e8e2da] hover:text-[#1d1b17]'
+                              ? 'bg-white text-[var(--text-primary)] font-bold border-[var(--border-main)] shadow-xs'
+                              : 'bg-[var(--bg-subtle)] text-[var(--text-muted)] border-[var(--border-main)] hover:text-[var(--text-primary)]'
                           }`}
                         >
                           {val === 1.5 ? '1.5R (Mặc định)' : `${val}R`}
@@ -5528,17 +5515,17 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
 
                   {/* Kiểu Khóa SL */}
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[11px] text-[#737973]">
+                    <span className="text-[11px] text-[var(--text-muted)]">
                       {language === 'vi' ? 'Kiểu khóa SL:' : 'Locking mode:'}
                     </span>
-                    <div className="flex items-center bg-[#0d1117] p-0.5 rounded-lg border border-[#e8e2da] text-xs">
+                    <div className="flex items-center bg-[var(--bg-subtle)] p-0.5 rounded-lg border border-[var(--border-main)] text-xs">
                       <button
                         type="button"
                         onClick={() => setContinuousTrailType('GAP')}
                         className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all cursor-pointer ${
                           continuousTrailType === 'GAP'
-                            ? 'bg-[#e8e2da] text-emerald-300 font-bold shadow-xs'
-                            : 'text-[#737973] hover:text-[#1d1b17]'
+                            ? 'bg-white text-[var(--text-primary)] font-bold shadow-xs'
+                            : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                         }`}
                         title={language === 'vi' ? 'Đệm 1 nấc: Chạm 1.5R dịch lên BE (0R), chạm 3.0R dịch lên 1.5R...' : 'Trailing buffer: Reaching 1.5R moves SL to 0R BE, 3.0R to 1.5R'}
                       >
@@ -5550,8 +5537,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                         onClick={() => setContinuousTrailType('DIRECT')}
                         className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all cursor-pointer ${
                           continuousTrailType === 'DIRECT'
-                            ? 'bg-[#e8e2da] text-[#1d1b17] font-bold shadow-xs'
-                            : 'text-[#737973] hover:text-[#1d1b17]'
+                            ? 'bg-white text-[var(--text-primary)] font-bold shadow-xs'
+                            : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                         }`}
                         title={language === 'vi' ? 'Khóa cùng nấc: Chạm 1.5R khóa 1.5R, chạm 3.0R khóa 3.0R...' : 'Direct step lock: Reaching 1.5R locks 1.5R'}
                       >
@@ -5562,19 +5549,19 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                 </div>
 
                 {/* Hướng dẫn cơ chế dịch SL */}
-                <div className="p-2 rounded-lg bg-[#0d1117] border border-[#e8e2da]/60 text-[11px] text-[#737973] space-y-1">
-                  <div className="flex items-center gap-1.5 text-[#424843] font-medium">
-                    <span className="text-emerald-400 font-bold">Quy luật dịch SL:</span>
+                <div className="p-2.5 rounded-xl bg-[var(--bg-subtle)]/60 border border-[var(--border-main)] text-[11px] text-[var(--text-secondary)] space-y-1">
+                  <div className="flex items-center gap-1.5 text-[var(--text-secondary)] font-medium">
+                    <span className="text-[var(--text-primary)] font-bold">Quy luật dịch SL:</span>
                     {continuousTrailType === 'GAP' ? (
                       <span>
-                        Chạm <strong className="text-emerald-300">+{continuousStepR}R</strong> $\rightarrow$ Dời SL về <strong className="text-[#1d1b17]">0.0R (BE Hòa Vốn)</strong> • 
-                        Chạm <strong className="text-emerald-300">+{(continuousStepR * 2).toFixed(1)}R</strong> $\rightarrow$ Dời SL lên <strong className="text-emerald-300">+{continuousStepR}R</strong> • 
-                        Chạm <strong className="text-emerald-300">+{(continuousStepR * 3).toFixed(1)}R</strong> $\rightarrow$ Dời SL lên <strong className="text-emerald-300">+{(continuousStepR * 2).toFixed(1)}R</strong>...
+                        Chạm <strong className="text-[var(--text-primary)]">+{continuousStepR}R</strong> $\rightarrow$ Dời SL về <strong className="text-[var(--text-primary)]">0.0R (BE Hòa Vốn)</strong> • 
+                        Chạm <strong className="text-[var(--text-primary)]">+{(continuousStepR * 2).toFixed(1)}R</strong> $\rightarrow$ Dời SL lên <strong className="text-[var(--text-primary)]">+{continuousStepR}R</strong> • 
+                        Chạm <strong className="text-[var(--text-primary)]">+{(continuousStepR * 3).toFixed(1)}R</strong> $\rightarrow$ Dời SL lên <strong className="text-[var(--text-primary)]">+{(continuousStepR * 2).toFixed(1)}R</strong>...
                       </span>
                     ) : (
                       <span>
-                        Chạm <strong className="text-emerald-300">+{continuousStepR}R</strong> $\rightarrow$ Khóa SL tại <strong className="text-emerald-300">+{continuousStepR}R</strong> • 
-                        Chạm <strong className="text-emerald-300">+{(continuousStepR * 2).toFixed(1)}R</strong> $\rightarrow$ Khóa SL tại <strong className="text-emerald-300">+{(continuousStepR * 2).toFixed(1)}R</strong>...
+                        Chạm <strong className="text-[var(--text-primary)]">+{continuousStepR}R</strong> $\rightarrow$ Khóa SL tại <strong className="text-[var(--text-primary)]">+{continuousStepR}R</strong> • 
+                        Chạm <strong className="text-[var(--text-primary)]">+{(continuousStepR * 2).toFixed(1)}R</strong> $\rightarrow$ Khóa SL tại <strong className="text-[var(--text-primary)]">+{(continuousStepR * 2).toFixed(1)}R</strong>...
                       </span>
                     )}
                   </div>
@@ -5584,8 +5571,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
               {/* 4 THẺ KPI TỔNG KẾT HIỆU QUẢ DỊCH SL LIÊN TỤC */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 relative z-10">
                 {/* Card 1: Vốn Giả Lập */}
-                <div className="p-3 bg-[#ede7df] rounded-xl border border-emerald-500/25 space-y-1">
-                  <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
+                <div className="p-3 bg-[#ede7df] rounded-xl border border-[#d8d0c5] space-y-1">
+                  <span className="text-[10px] font-bold text-[var(--text-primary)] uppercase tracking-wider">
                     {language === 'vi' ? 'Vốn Cuối (Dịch SL Liên Tục)' : 'Continuous Trailing Equity'}
                   </span>
                   <div className="text-lg font-bold font-mono text-[#1d1b17]">
@@ -5689,7 +5676,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                   <div className="flex items-center gap-2 flex-wrap">
                     {/* Search */}
                     <div className="relative">
-                      <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#737973]" />
+                      <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
                       <input
                         type="text"
                         value={continuousSearchQuery}
@@ -5698,12 +5685,12 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                           setContinuousPage(1);
                         }}
                         placeholder={language === 'vi' ? 'Tìm Symbol, Ticket...' : 'Search Symbol, Ticket...'}
-                        className="pl-7 pr-2.5 py-1 text-[11px] font-mono bg-[#0d1117] border border-[#e8e2da] rounded-lg text-[#1d1b17] placeholder:text-[#737973] focus:outline-hidden focus:border-emerald-500 w-36 sm:w-44"
+                        className="pl-8 pr-3 py-1.5 text-xs font-mono bg-[var(--bg-subtle)] border border-[var(--border-main)] rounded-full text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-hidden focus:border-[#1d1b17] w-40 sm:w-48"
                       />
                     </div>
 
                     {/* Filter status */}
-                    <div className="flex items-center gap-1 bg-[#0d1117] p-0.5 rounded-lg border border-[#e8e2da] text-[10px] font-mono">
+                    <div className="flex items-center gap-0.5 bg-[var(--bg-subtle)] p-0.5 rounded-full border border-[var(--border-main)] text-[11px] font-sans">
                       {[
                         { id: 'ALL', label: language === 'vi' ? 'Tất cả' : 'All' },
                         { id: 'WIN', label: language === 'vi' ? 'Lãi' : 'Win' },
@@ -5719,10 +5706,10 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                             setContinuousFilterStatus(f.id as any);
                             setContinuousPage(1);
                           }}
-                          className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                          className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${
                             continuousFilterStatus === f.id
-                              ? 'bg-[#e8e2da] text-emerald-300 font-bold'
-                              : 'text-[#737973] hover:text-[#1d1b17]'
+                              ? 'clay-pill bg-white text-[var(--text-primary)] font-bold shadow-xs'
+                              : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                           }`}
                         >
                           {f.label}
@@ -5732,25 +5719,25 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                   </div>
                 </div>
 
-                {/* Table */}
-                <div className="overflow-x-auto border border-[#e8e2da] rounded-xl bg-[#0d1117]/80">
-                  <table className="w-full text-left text-xs font-mono">
-                    <thead className="bg-[#ede7df] text-[#737973] uppercase text-[10px] tracking-wider border-b border-[#e8e2da]">
+                {/* Table: CHUẨN TRẮNG SÁNG NHƯ TAB HISTORY */}
+                <div className="overflow-x-auto border border-[var(--border-main)] rounded-2xl bg-white shadow-xs">
+                  <table className="w-full text-left text-xs font-sans border-collapse">
+                    <thead className="sticky top-0 bg-white text-[var(--text-muted)] uppercase text-[11px] font-medium tracking-wider border-b border-[var(--border-main)] z-10">
                       <tr>
-                        <th className="py-2 px-2.5">Lệnh / Cặp</th>
-                        <th className="py-2 px-2 text-center">Loại / Lot</th>
-                        <th className="py-2 px-2 text-right">Đỉnh MFE Thật</th>
-                        <th className="py-2 px-2 text-center">Nấc Đã Vượt</th>
-                        <th className="py-2 px-2 text-right">Mức SL Khóa</th>
-                        <th className="py-2 px-2 text-right">PnL Dịch SL</th>
-                        <th className="py-2 px-2 text-right">PnL Thực Tế</th>
-                        <th className="py-2 px-2.5 text-right">Chênh Lệch</th>
+                        <th className="py-3 px-3">Lệnh / Cặp</th>
+                        <th className="py-3 px-2 text-center">Loại / Lot</th>
+                        <th className="py-3 px-2 text-right">Đỉnh MFE Thật</th>
+                        <th className="py-3 px-2 text-center">Nấc Đã Vượt</th>
+                        <th className="py-3 px-2 text-right">Mức SL Khóa</th>
+                        <th className="py-3 px-2 text-right">PnL Dịch SL</th>
+                        <th className="py-3 px-2 text-right">PnL Thực Tế</th>
+                        <th className="py-3 px-3 text-right">Chênh Lệch</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#30363d]/50 text-[11px]">
+                    <tbody className="divide-y divide-[var(--border-subtle)] text-xs bg-white">
                       {paginatedContinuousTrades.length === 0 ? (
                         <tr>
-                          <td colSpan={8} className="py-8 text-center text-[#737973] font-mono text-xs">
+                          <td colSpan={8} className="py-12 text-center text-[var(--text-muted)] font-sans text-xs">
                             {language === 'vi' ? 'Không có lệnh nào phù hợp bộ lọc' : 'No trades match filter'}
                           </td>
                         </tr>
@@ -5764,52 +5751,48 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                           const isSimLoss = tr.simPnl < -5;
 
                           return (
-                            <tr key={tr.tradeId} className="hover:bg-[#ede7df]/70 transition-colors">
+                            <tr key={tr.tradeId} className="h-[44px] hover:bg-[var(--table-row-hover)] text-[var(--text-primary)] transition-colors">
                               {/* Ticket & Symbol */}
-                              <td className="py-2 px-2.5 font-mono">
-                                <div className="font-bold text-[#1d1b17]">#{tr.ticket}</div>
-                                <div className="text-[10px] text-[#737973] font-normal">{tr.symbol}</div>
+                              <td className="py-2.5 px-3 font-mono">
+                                <div className="font-bold text-[var(--text-primary)] text-xs">#{tr.ticket}</div>
+                                <div className="text-[11px] text-[var(--text-muted)] font-normal">{tr.symbol}</div>
                               </td>
 
                               {/* Loại & Volume */}
-                              <td className="py-2 px-2 text-center font-mono">
-                                <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold border ${
+                              <td className="py-2.5 px-2 text-center font-mono">
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
                                   tr.type === 'BUY'
-                                    ? 'bg-[#ede7df] text-[#1d1b17] border-[#d8d0c5]'
-                                    : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                                    ? 'bg-[#4a6152]/10 text-[var(--color-win)] border-[#4a6152]/30'
+                                    : 'bg-[#825249]/10 text-[var(--color-loss)] border-[#825249]/30'
                                 }`}>
                                   {tr.type}
                                 </span>
-                                <div className="text-[10px] text-[#737973] mt-0.5">{tr.volume}L</div>
+                                <div className="text-[10px] text-[var(--text-muted)] mt-0.5">{tr.volume}L</div>
                               </td>
 
                               {/* Đỉnh MFE Thật */}
-                              <td className="py-2 px-2 text-right font-mono font-bold text-emerald-400">
+                              <td className="py-2.5 px-2 text-right font-mono font-medium text-xs text-[var(--color-win)]">
                                 <div>+{tr.effectiveMaxR.toFixed(2)}R</div>
                                 {tr.candlesCount > 0 && (
-                                  <div className="text-[9px] text-[#737973] font-normal">
+                                  <div className="text-[10px] text-[var(--text-muted)] font-normal">
                                     {tr.candlesCount} nến M5
                                   </div>
                                 )}
                               </td>
 
                               {/* Nấc Đã Vượt */}
-                              <td className="py-2 px-2 text-center font-mono">
-                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                  tr.stepCount > 0 
-                                    ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' 
-                                    : 'bg-[#ede7df] text-[#737973] border border-[#e8e2da]'
-                                }`}>
+                              <td className="py-2.5 px-2 text-center font-mono">
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--bg-subtle)] text-[var(--text-primary)] border border-[var(--border-main)]">
                                   {tr.stepCount} nấc
                                 </span>
                                 {tr.candlesCount > 0 && (
-                                  <div className="text-[9px] mt-0.5 font-sans">
+                                  <div className="text-[10px] mt-0.5 font-sans">
                                     {tr.stoppedByTrail ? (
-                                      <span className="text-[#1d1b17] font-medium" title="Râu nến M5 giật ngược cắn trúng mức SL đã dời">
+                                      <span className="text-[var(--text-primary)] font-medium" title="Râu nến M5 giật ngược cắn trúng mức SL đã dời">
                                         Quét râu SL
                                       </span>
                                     ) : (
-                                      <span className="text-[#737973]">
+                                      <span className="text-[var(--text-muted)]">
                                         Gồng hết nến
                                       </span>
                                     )}
@@ -5818,40 +5801,40 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                               </td>
 
                               {/* Mức SL Khóa */}
-                              <td className="py-2 px-2 text-right font-mono font-bold">
-                                <span className={tr.lockedSlR > 0 ? 'text-emerald-400' : tr.lockedSlR === 0 ? 'text-[#424843]' : 'text-[#737973]'}>
+                              <td className="py-2.5 px-2 text-right font-mono text-xs">
+                                <span className={tr.lockedSlR > 0 ? 'text-[var(--color-win)] font-medium' : tr.lockedSlR === 0 ? 'text-[var(--text-primary)] font-medium' : 'text-[var(--text-muted)]'}>
                                   {tr.lockedSlR >= 0 ? `+${tr.lockedSlR.toFixed(2)}R` : 'Gốc (-1R)'}
                                 </span>
                               </td>
 
                               {/* PnL Dịch SL */}
-                              <td className="py-2 px-2 text-right font-mono font-bold">
-                                <span className={isSimWin ? 'text-emerald-400' : isSimLoss ? 'text-rose-400' : 'text-[#424843]'}>
+                              <td className="py-2.5 px-2 text-right font-mono text-xs">
+                                <span className={isSimWin ? 'text-[var(--color-win)] font-medium' : isSimLoss ? 'text-[var(--color-loss)] font-medium' : 'text-[var(--text-muted)]'}>
                                   {tr.simPnl >= 0 ? '+' : ''}${tr.simPnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </span>
-                                <div className="text-[10px] text-[#737973] font-normal">
+                                <div className="text-[10px] text-[var(--text-muted)] font-normal">
                                   {tr.simR >= 0 ? `+${tr.simR.toFixed(2)}R` : `${tr.simR.toFixed(2)}R`}
                                 </div>
                               </td>
 
                               {/* PnL Thực Tế */}
-                              <td className="py-2 px-2 text-right font-mono">
-                                <span className={isActualWin ? 'text-emerald-400' : isActualLoss ? 'text-rose-400' : 'text-[#737973]'}>
+                              <td className="py-2.5 px-2 text-right font-mono text-xs">
+                                <span className={isActualWin ? 'text-[var(--color-win)] font-medium' : isActualLoss ? 'text-[var(--color-loss)] font-medium' : 'text-[var(--text-muted)]'}>
                                   {tr.net >= 0 ? '+' : ''}${tr.net.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </span>
-                                <div className="text-[10px] text-[#737973] font-normal">
+                                <div className="text-[10px] text-[var(--text-muted)] font-normal">
                                   {tr.risk1R > 0 ? `${(tr.net / tr.risk1R).toFixed(2)}R` : '-'}
                                 </div>
                               </td>
 
                               {/* Chênh Lệch */}
-                              <td className="py-2 px-2.5 text-right font-mono font-bold">
+                              <td className="py-2.5 px-3 text-right font-mono font-medium text-xs">
                                 <span className={`px-1.5 py-0.5 rounded text-[10px] border ${
                                   isBetter
-                                    ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                                    ? 'bg-[#4a6152]/10 text-[var(--color-win)] border-[#4a6152]/30 font-semibold'
                                     : isWorse
-                                    ? 'bg-rose-500/10 text-rose-300 border-rose-500/30'
-                                    : 'bg-[#ede7df] text-[#737973] border-[#e8e2da]'
+                                    ? 'bg-[#825249]/10 text-[var(--color-loss)] border-[#825249]/30 font-semibold'
+                                    : 'bg-[var(--bg-subtle)] text-[var(--text-muted)] border border-[var(--border-main)]'
                                 }`}>
                                   {tr.delta >= 0 ? '+' : ''}${tr.delta.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </span>
@@ -5865,14 +5848,14 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                 </div>
 
                 {/* Phân trang Dịch SL */}
-                <div className="px-3 py-2 bg-[#ede7df] border border-[#e8e2da] rounded-xl flex items-center justify-between gap-3 flex-wrap">
+                <div className="px-4 py-2 bg-[var(--bg-card)] border-t border-[var(--border-main)] flex items-center justify-between gap-3 flex-wrap">
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-[#737973] font-mono">
+                    <span className="text-[11px] text-[#1d1b17] font-mono">
                       Showing {filteredContinuousTrades.length === 0 ? 0 : (safeContinuousPage - 1) * effectiveContinuousPageSize + 1}-{Math.min(safeContinuousPage * effectiveContinuousPageSize, filteredContinuousTrades.length)} of {filteredContinuousTrades.length} orders
                     </span>
 
-                    <div className="hidden sm:flex items-center gap-1 text-[10px] ml-2">
-                      <span className="text-[#737973] text-[10px]">Page size:</span>
+                    <div className="hidden sm:flex items-center gap-1 text-xs ml-2">
+                      <span className="text-[#1d1b17] font-medium text-[11px]">Page size:</span>
                       {[5, 10, 20, 50].map((sz) => (
                         <button
                           key={sz}
@@ -5881,10 +5864,10 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                             setContinuousPageSize(sz);
                             setContinuousPage(1);
                           }}
-                          className={`px-1.5 py-0.2 rounded text-[10px] font-mono transition-colors cursor-pointer ${
+                          className={`px-2 py-0.5 rounded text-[11px] font-mono transition-colors cursor-pointer ${
                             continuousPageSize === sz
-                              ? 'bg-[#e8e2da] text-[#424843] font-bold border border-[#e8e2da]'
-                              : 'text-[#737973] hover:text-[#424843] hover:bg-[#e8e2da]'
+                              ? 'bg-[#e8e2da] text-[#1d1b17] font-bold border border-[#d8d0c5]'
+                              : 'text-[var(--text-muted)] hover:text-[#1d1b17] hover:bg-[#e8e2da]'
                           }`}
                         >
                           {sz}
@@ -5896,10 +5879,10 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                           setContinuousPageSize(0);
                           setContinuousPage(1);
                         }}
-                        className={`px-1.5 py-0.2 rounded text-[10px] font-mono transition-colors cursor-pointer ${
+                        className={`px-2 py-0.5 rounded text-[11px] font-mono transition-colors cursor-pointer ${
                           continuousPageSize === 0
-                            ? 'bg-[#e8e2da] text-[#424843] font-bold border border-[#e8e2da]'
-                            : 'text-[#737973] hover:text-[#424843] hover:bg-[#e8e2da]'
+                            ? 'bg-[#e8e2da] text-[#1d1b17] font-bold border border-[#d8d0c5]'
+                            : 'text-[var(--text-muted)] hover:text-[#1d1b17] hover:bg-[#e8e2da]'
                         }`}
                       >
                         {language === 'vi' ? 'Tất cả' : 'All'}
@@ -5912,14 +5895,14 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                       type="button"
                       disabled={safeContinuousPage <= 1}
                       onClick={() => setContinuousPage(p => Math.max(1, p - 1))}
-                      className="w-5 h-5 rounded flex items-center justify-center bg-[#e8e2da] hover:bg-[#30363d] text-[#737973] hover:text-[#1d1b17] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors text-[10px] border border-[#e8e2da]"
+                      className="w-5 h-5 rounded flex items-center justify-center bg-[#ede7df] hover:bg-[#e8e2da] text-[#737973] hover:text-[#1d1b17] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors text-[10px] border border-[#d8d0c5]"
                     >
                       &lt;
                     </button>
 
                     {continuousPaginationNumbers.map((pNum, idx) => {
                       if (pNum === -1) {
-                        return <span key={`c-ellipsis-${idx}`} className="w-3 text-center text-slate-600 text-[10px]">...</span>;
+                        return <span key={`c-ellipsis-${idx}`} className="w-3 text-center text-[#737973] text-[10px]">...</span>;
                       }
                       const isCur = pNum === safeContinuousPage;
                       return (
@@ -5929,8 +5912,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                           onClick={() => setContinuousPage(pNum)}
                           className={`w-5 h-5 rounded flex items-center justify-center font-medium text-[10px] transition-colors cursor-pointer ${
                             isCur
-                              ? 'bg-[#30363d] text-[#1d1b17] font-bold border border-slate-500'
-                              : 'hover:bg-[#e8e2da] text-[#737973] hover:text-[#424843]'
+                              ? 'bg-[#e8e2da] text-[#1d1b17] font-bold border border-[#d8d0c5]'
+                              : 'hover:bg-[#e8e2da] text-[#737973] hover:text-[#1d1b17]'
                           }`}
                         >
                           {pNum}
@@ -5942,7 +5925,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                       type="button"
                       disabled={safeContinuousPage >= totalContinuousPages}
                       onClick={() => setContinuousPage(p => Math.min(totalContinuousPages, p + 1))}
-                      className="w-5 h-5 rounded flex items-center justify-center bg-[#e8e2da] hover:bg-[#30363d] text-[#737973] hover:text-[#1d1b17] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors text-[10px] border border-[#e8e2da]"
+                      className="w-5 h-5 rounded flex items-center justify-center bg-[#ede7df] hover:bg-[#e8e2da] text-[#737973] hover:text-[#1d1b17] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors text-[10px] border border-[#d8d0c5]"
                     >
                       &gt;
                     </button>
@@ -5983,8 +5966,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
               </span>
               <span className={`px-2.5 py-1 rounded border ${
                 partialScaleData.deltaTotal >= 0 
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' 
-                  : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                  ? 'bg-[#e8e2da] border-[#d8d0c5] text-[#4a6152]' 
+                  : 'bg-[#e8e2da] border-[#d8d0c5] text-[#825249]'
               }`}>
                 {language === 'vi' ? 'Chênh lệch vs Thực tế:' : 'Diff vs Actual:'}{' '}
                 <strong className="font-bold">
@@ -5999,7 +5982,6 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
             {/* Hàng chọn Preset nhanh */}
             <div className="flex items-center gap-2 flex-wrap text-xs">
               <span className="text-[#737973] font-mono font-bold text-[11px] flex items-center gap-1">
-                <Sliders className="w-3.5 h-3.5 text-[#1d1b17]" />
                 {language === 'vi' ? 'Chiến lược mẫu:' : 'Presets:'}
               </span>
               <div className="flex items-center gap-1.5 flex-wrap">
@@ -6016,8 +5998,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                       }}
                       className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer border ${
                         isMatch
-                          ? 'bg-violet-600 text-[#1d1b17] border-violet-500 shadow-md shadow-violet-500/20'
-                          : 'bg-[#ede7df] text-[#424843] border-[#e8e2da] hover:border-[#d8d0c5] hover:text-[#1d1b17]'
+                          ? 'bg-white text-[#1d1b17] border-[#d8d0c5] shadow-xs'
+                          : 'bg-[#ede7df] text-[#424843] border-[#e8e2da] hover:border-[#d8d0c5] hover:text-[#4a6152]'
                       }`}
                     >
                       {preset.label}
@@ -6030,14 +6012,13 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
             {/* Bảng Tùy chỉnh chi tiết từng mốc (Tiers Editor) */}
             <div className="p-3 bg-[#ede7df] rounded-xl border border-[#e8e2da] space-y-2.5">
               <div className="flex items-center justify-between flex-wrap gap-2">
-                <span className="text-xs font-bold text-[#1d1b17] flex items-center gap-1.5">
-                  <Layers className="w-3.5 h-3.5 text-[#1d1b17]" />
+                <span className="text-xs font-bold text-[#1d1b17]">
                   {language === 'vi' ? 'Tùy Chỉnh Các Mốc Chốt Lời (Tiers):' : 'Customize Take-Profit Tiers:'}
                 </span>
                 <div className="flex items-center gap-2">
                   <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded border ${
                     Math.abs(partialScaleData.rawTotalRatioPercent - 100) < 0.5
-                      ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                      ? 'bg-[#e8e2da] text-[#4a6152] border-[#d8d0c5]'
                       : 'bg-[#ede7df] text-[#1d1b17] border-[#d8d0c5]'
                   }`}>
                     {language === 'vi' ? 'Tổng Khối Lượng:' : 'Total Volume:'} {partialScaleData.rawTotalRatioPercent}%
@@ -6076,7 +6057,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
               {/* Danh sách các thẻ mốc TP */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
                 {partialScaleTiers.map((tier, idx) => (
-                  <div key={tier.id} className="p-2.5 rounded-lg bg-[#0d1117] border border-[#e8e2da] space-y-1.5 relative group">
+                  <div key={tier.id} className="p-2.5 rounded-lg bg-white border border-[#d8d0c5] space-y-1.5 relative group">
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="font-bold text-[#1d1b17] font-mono">
                         {language === 'vi' ? `Mốc TP${idx + 1}` : `TP${idx + 1}`}
@@ -6110,7 +6091,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                               t.id === tier.id ? { ...t, portionFraction: frac, portionRatio: ratio } : t
                             ));
                           }}
-                          className="w-full px-2 py-1 text-xs font-mono font-bold bg-[#ede7df] border border-[#e8e2da] rounded text-[#1d1b17] text-center focus:outline-hidden focus:border-violet-500"
+                          className="w-full px-2 py-1 text-xs font-mono font-bold bg-[#ede7df] border border-[#d8d0c5] rounded text-[#1d1b17] text-center focus:outline-hidden focus:border-[#4a6152]"
                           placeholder="1/3, 50%..."
                         />
                       </div>
@@ -6134,7 +6115,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                                 ));
                               }
                             }}
-                            className="w-full px-2 py-1 text-xs font-mono font-bold bg-[#ede7df] border border-[#e8e2da] rounded text-[#1d1b17] text-center focus:outline-hidden focus:border-sky-500"
+                            className="w-full px-2 py-1 text-xs font-mono font-bold bg-[#ede7df] border border-[#d8d0c5] rounded text-[#1d1b17] text-center focus:outline-hidden focus:border-[#4a6152]"
                           />
                           <span className="text-xs font-mono text-[#737973] ml-1">R</span>
                         </div>
@@ -6161,7 +6142,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                               ));
                             }
                           }}
-                          className="w-full px-1.5 py-0.5 text-xs font-mono font-bold bg-[#ede7df] border border-[#e8e2da] rounded text-[#1d1b17] text-center focus:outline-hidden focus:border-amber-500"
+                          className="w-full px-1.5 py-0.5 text-xs font-mono font-bold bg-[#ede7df] border border-[#d8d0c5] rounded text-[#1d1b17] text-center focus:outline-hidden focus:border-[#4a6152]"
                         />
                         <span className="text-xs font-mono text-[#737973] ml-1">R</span>
                       </div>
@@ -6190,8 +6171,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                       onClick={() => setPartialRemainingMode(opt.id as any)}
                       className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer border ${
                         partialRemainingMode === opt.id
-                          ? 'bg-[#ede7df] text-[#1d1b17] border-[#d8d0c5] shadow-xs'
-                          : 'bg-[#0d1117] text-[#737973] border-[#e8e2da] hover:text-[#1d1b17]'
+                          ? 'bg-[#e8e2da] text-[#1d1b17] border-[#d8d0c5] font-bold shadow-xs'
+                          : 'bg-white text-[var(--text-muted)] border-[#d8d0c5] hover:text-[#1d1b17] hover:bg-[#e8e2da]'
                       }`}
                     >
                       {opt.label}
@@ -6218,8 +6199,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
             </div>
 
             {/* Card 2: Winrate */}
-            <div className="p-3 bg-[#ede7df] rounded-xl border border-emerald-500/25 space-y-1">
-              <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
+            <div className="p-3 bg-[#ede7df] rounded-xl border border-[#d8d0c5] space-y-1">
+              <span className="text-[10px] font-bold text-[var(--text-primary)] uppercase tracking-wider">
                 {language === 'vi' ? 'Tỷ Lệ Lệnh Có Lãi (Winrate)' : 'Simulated Winrate'}
               </span>
               <div className="text-lg font-bold font-mono text-emerald-400">
@@ -6240,7 +6221,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                   const hits = partialScaleData.tierHitCounts[t.id] || 0;
                   const pct = partialScaleData.totalTrades > 0 ? ((hits / partialScaleData.totalTrades) * 100).toFixed(0) : '0';
                   return (
-                    <span key={t.id} className="text-[11px] font-mono bg-[#0d1117] px-2 py-0.5 rounded border border-[#e8e2da] text-[#1d1b17]">
+                    <span key={t.id} className="text-[11px] font-mono bg-white px-2 py-0.5 rounded border border-[#d8d0c5] text-[#1d1b17]">
                       TP{idx + 1}({t.targetR}R): <strong>{pct}%</strong>
                     </span>
                   );
@@ -6328,7 +6309,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                       setPartialPage(1);
                     }}
                     placeholder={language === 'vi' ? 'Tìm Symbol, Ticket...' : 'Search Symbol, Ticket...'}
-                    className="pl-7 pr-2.5 py-1 text-[11px] font-mono bg-[#0d1117] border border-[#e8e2da] rounded-lg text-[#1d1b17] placeholder:text-[#737973] focus:outline-hidden focus:border-violet-500 w-36 sm:w-44"
+                    className="pl-7 pr-2.5 py-1 text-[11px] font-mono bg-white border border-[#d8d0c5] rounded-lg text-[#1d1b17] placeholder:text-[#737973] focus:outline-hidden focus:border-[#4a6152] w-36 sm:w-44"
                   />
                 </div>
 
@@ -6339,7 +6320,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                     setPartialFilterStatus(e.target.value as any);
                     setPartialPage(1);
                   }}
-                  className="px-2 py-1 text-[11px] font-sans bg-[#0d1117] border border-[#e8e2da] rounded-lg text-[#1d1b17] focus:outline-hidden focus:border-violet-500 cursor-pointer"
+                  className="px-2.5 py-1.5 text-xs font-sans bg-[var(--bg-subtle)] border border-[var(--border-main)] rounded-full text-[var(--text-primary)] focus:outline-hidden focus:border-[#1d1b17] cursor-pointer"
                 >
                   <option value="ALL">{language === 'vi' ? 'Tất cả trạng thái' : 'All Outcomes'}</option>
                   <option value="WIN">{language === 'vi' ? 'Lệnh có lãi (> 0$)' : 'Winning Trades'}</option>
@@ -6350,27 +6331,27 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
               </div>
             </div>
 
-            {/* Bảng dữ liệu */}
-            <div className="overflow-x-auto rounded-lg border border-[#e8e2da] bg-[#0d1117]/60 max-h-[460px] overflow-y-auto">
-              <table className="w-full text-xs text-left border-collapse">
-                <thead className="sticky top-0 bg-[#ede7df] text-[#737973] font-mono text-[10px] uppercase tracking-wider z-20 border-b border-[#e8e2da]">
+            {/* Bảng dữ liệu chuẩn Tab History */}
+            <div className="overflow-x-auto rounded-2xl border border-[var(--border-main)] bg-white shadow-xs max-h-[460px] overflow-y-auto">
+              <table className="w-full text-xs text-left border-collapse font-sans">
+                <thead className="sticky top-0 bg-white text-[var(--text-muted)] font-medium text-[11px] uppercase tracking-wider z-20 border-b border-[var(--border-main)]">
                   <tr>
-                    <th className="py-2 px-2.5 text-center w-10">#</th>
-                    <th className="py-2 px-2 text-left w-24">Ticket</th>
-                    <th className="py-2 px-2 text-left w-28">Symbol</th>
-                    <th className="py-2 px-2 text-right w-24">Entry / SL</th>
-                    <th className="py-2 px-2 text-right w-20">Risk 1R</th>
-                    <th className="py-2 px-2 text-left min-w-[300px]">{language === 'vi' ? 'Đối Chiếu MFE & Dịch SL' : 'MFE Verification & Trailing SL'}</th>
-                    <th className="py-2 px-2 text-right w-24">{language === 'vi' ? 'Đỉnh MFE Thật' : 'Peak MFE'}</th>
-                    <th className="py-2 px-2 text-right w-24">PnL Cắt Từng Phần</th>
-                    <th className="py-2 px-2 text-right w-24">PnL Thực Tế</th>
-                    <th className="py-2 px-2.5 text-right w-24">Chênh Lệch</th>
+                    <th className="py-2.5 px-3 text-center w-10">#</th>
+                    <th className="py-2.5 px-2 text-left w-24">Ticket</th>
+                    <th className="py-2.5 px-2 text-left w-28">Symbol</th>
+                    <th className="py-2.5 px-2 text-right w-24">Entry / SL</th>
+                    <th className="py-2.5 px-2 text-right w-20">Risk 1R</th>
+                    <th className="py-2.5 px-2 text-left min-w-[300px]">{language === 'vi' ? 'Đối Chiếu MFE & Dịch SL' : 'MFE Verification & Trailing SL'}</th>
+                    <th className="py-2.5 px-2 text-right w-24">{language === 'vi' ? 'Đỉnh MFE Thật' : 'Peak MFE'}</th>
+                    <th className="py-2.5 px-2 text-right w-24">PnL Cắt Từng Phần</th>
+                    <th className="py-2.5 px-2 text-right w-24">PnL Thực Tế</th>
+                    <th className="py-2.5 px-3 text-right w-24">Chênh Lệch</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#30363d]/40 font-mono text-[11px]">
+                <tbody className="divide-y divide-[var(--border-subtle)] text-xs bg-white text-[var(--text-primary)]">
                   {paginatedPartialTrades.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="py-8 text-center text-[#737973] font-sans">
+                      <td colSpan={10} className="py-12 text-center text-[var(--text-muted)] font-sans text-xs">
                         {language === 'vi' ? 'Không có dữ liệu lệnh phù hợp với bộ lọc' : 'No trades match filter'}
                       </td>
                     </tr>
@@ -6386,41 +6367,41 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                       return (
                         <tr 
                           key={tr.ticket || tr.idx} 
-                          className="hover:bg-[#1f2631]/80 transition-colors"
+                          className="h-[44px] hover:bg-[var(--table-row-hover)] text-[var(--text-primary)] transition-colors"
                         >
-                          <td className="py-1.5 px-2.5 text-center text-[#737973] font-bold">
+                          <td className="py-2 px-3 text-center text-[var(--text-muted)] font-mono text-[11px]">
                             {tr.idx}
                           </td>
 
-                          <td className="py-1.5 px-2 text-left text-[#424843] font-semibold truncate max-w-[90px]">
-                            {tr.ticket}
+                          <td className="py-2 px-2 text-left font-mono font-medium text-xs text-[var(--text-primary)] truncate max-w-[90px]">
+                            #{tr.ticket}
                           </td>
 
-                          <td className="py-1.5 px-2 text-left">
+                          <td className="py-2 px-2 text-left">
                             <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-[#1d1b17]">{tr.symbol}</span>
-                              <span className={`px-1 py-0.2 rounded text-[9px] font-bold ${
+                              <span className="font-bold text-[var(--text-primary)] text-xs">{tr.symbol}</span>
+                              <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold border ${
                                 tr.type === 'BUY' 
-                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
-                                  : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                  ? 'bg-[#4a6152]/10 text-[var(--color-win)] border-[#4a6152]/30' 
+                                  : 'bg-[#825249]/10 text-[var(--color-loss)] border-[#825249]/30'
                               }`}>
                                 {tr.type}
                               </span>
-                              <span className="text-[10px] text-[#737973] font-normal">{tr.volume}L</span>
+                              <span className="text-[10px] text-[var(--text-muted)] font-mono">{tr.volume}L</span>
                             </div>
                           </td>
 
-                          <td className="py-1.5 px-2 text-right font-mono text-[10px] text-[#424843]">
+                          <td className="py-2 px-2 text-right font-mono text-xs text-[var(--text-primary)]">
                             <div>{tr.openPrice > 0 ? tr.openPrice : '-'}</div>
-                            <div className="text-[#737973] text-[9px]">SL: {tr.initialSl > 0 ? tr.initialSl : 'None'}</div>
+                            <div className="text-[var(--text-muted)] text-[10px]">SL: {tr.initialSl > 0 ? tr.initialSl : 'None'}</div>
                           </td>
 
-                          <td className="py-1.5 px-2 text-right font-mono text-[#424843]">
+                          <td className="py-2 px-2 text-right font-mono text-xs text-[var(--text-primary)]">
                             ${tr.risk1R.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                           </td>
 
-                          {/* Diễn biến từng mốc TP (Đối chiếu trực tiếp MFE & Trailing SL) */}
-                          <td className="py-1.5 px-2 text-left">
+                          {/* Diễn biến từng mốc TP */}
+                          <td className="py-2 px-2 text-left">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               {tr.tierResults.map((t, tIdx) => {
                                 const isHit = t.status === 'HIT';
@@ -6432,40 +6413,31 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                                     key={t.id || tIdx}
                                     className={`px-2 py-0.5 rounded text-[10px] font-mono flex items-center gap-1 border ${
                                       isHit
-                                        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40 shadow-xs'
+                                        ? 'bg-[#4a6152]/10 text-[var(--color-win)] border-[#4a6152]/30 font-semibold'
                                         : isTrailed
-                                        ? 'bg-[#ede7df] text-[#1d1b17] border-[#d8d0c5] shadow-xs'
+                                        ? 'bg-[var(--bg-subtle)] text-[var(--text-primary)] border-[var(--border-main)]'
                                         : isBE
-                                        ? 'bg-[#ede7df] text-[#1d1b17] border-[#d8d0c5]'
+                                        ? 'bg-[var(--bg-subtle)] text-[var(--text-primary)] border-[var(--border-main)]'
                                         : isSL
-                                        ? 'bg-rose-500/15 text-rose-300 border-rose-500/40'
-                                        : 'bg-[#ede7df] text-[#424843] border-[#e8e2da]'
-                                    }`}
-                                    title={`ĐỐI CHIẾU MFE: Đỉnh MFE lệnh là ${tr.effectiveMaxR}R vs Mốc TP${tIdx + 1} (${t.targetR}R).\n${
-                                      isHit 
-                                        ? `ĐỦ MFE (${tr.effectiveMaxR}R >= ${t.targetR}R) -> Chốt lời ${t.portionFraction}: +$${t.tierPnl}` 
-                                        : isTrailed
-                                        ? `KHÔNG ĐỦ MFE -> Thoát ở mức dời SL khóa lãi +${t.trailStopR}R: +$${t.tierPnl}`
-                                        : isBE 
-                                        ? `KHÔNG ĐỦ MFE -> Đã dời SL về BE: 0$` 
-                                        : `KHÔNG ĐỦ MFE -> Cắn SL: $${t.tierPnl}`
+                                        ? 'bg-[#825249]/10 text-[var(--color-loss)] border-[#825249]/30 font-semibold'
+                                        : 'bg-[var(--bg-subtle)] text-[var(--text-muted)] border-[var(--border-main)]'
                                     }`}
                                   >
-                                    <span className="font-bold text-[#737973]">TP{tIdx + 1}({t.targetR}R):</span>
+                                    <span className="font-semibold text-[var(--text-muted)]">TP{tIdx + 1}({t.targetR}R):</span>
                                     {isHit ? (
-                                      <span className="text-emerald-400 font-bold flex items-center gap-0.5">
-                                        ✓ ĐẠT (+${t.tierPnl.toFixed(0)})
+                                      <span className="text-[#4a6152] font-semibold flex items-center gap-0.5">
+                                        ĐẠT (+${t.tierPnl.toFixed(0)})
                                       </span>
                                     ) : isTrailed ? (
-                                      <span className="text-[#1d1b17] font-semibold">
-                                        🛡️ Khóa +{t.trailStopR}R (+${t.tierPnl.toFixed(0)})
+                                      <span className="text-[var(--text-primary)] font-medium">
+                                        Khóa +{t.trailStopR}R (+${t.tierPnl.toFixed(0)})
                                       </span>
                                     ) : isBE ? (
-                                      <span className="text-[#1d1b17] font-semibold">
-                                        🛡️ BE $0
+                                      <span className="text-[var(--text-primary)] font-medium">
+                                        BE $0
                                       </span>
                                     ) : isSL ? (
-                                      <span className="text-rose-400 font-semibold">
+                                      <span className="text-[#825249] font-medium">
                                         SL ${t.tierPnl.toFixed(0)}
                                       </span>
                                     ) : (
@@ -6477,44 +6449,44 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                             </div>
                           </td>
 
-                          {/* Đỉnh MFE Thật (Cùng màu & thiết kế với 2 cột PnL bên cạnh) */}
-                          <td className="py-1.5 px-2 text-right font-mono">
-                            <span className={tr.mfeUsd > 0 || tr.effectiveMaxR > 0 ? 'text-emerald-400 font-bold' : 'text-[#737973]'}>
+                          {/* Đỉnh MFE Thật */}
+                          <td className="py-2 px-2 text-right font-mono text-xs">
+                            <span className={tr.mfeUsd > 0 || tr.effectiveMaxR > 0 ? 'text-[#4a6152] font-medium' : 'text-[var(--text-muted)]'}>
                               {tr.mfeUsd > 0 ? `+$${tr.mfeUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : (tr.effectiveMaxR > 0 ? `+$${(tr.effectiveMaxR * tr.risk1R).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '$0.00')}
                             </span>
-                            <div className="text-[9px] text-[#737973] font-normal">
+                            <div className="text-[10px] text-[var(--text-muted)] font-normal">
                               {tr.effectiveMaxR > 0 ? `+${tr.effectiveMaxR.toFixed(2)}R` : '0R'}
                             </div>
                           </td>
 
                           {/* PnL Cắt Từng Phần */}
-                          <td className="py-1.5 px-2 text-right font-bold font-mono">
-                            <span className={isSimWin ? 'text-emerald-400' : isSimLoss ? 'text-rose-400' : 'text-[#737973]'}>
+                          <td className="py-2 px-2 text-right font-mono text-xs font-medium">
+                            <span className={isSimWin ? 'text-[#4a6152]' : isSimLoss ? 'text-[#825249]' : 'text-[var(--text-muted)]'}>
                               {tr.simPnl >= 0 ? '+' : ''}${tr.simPnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
-                            <div className="text-[9px] text-[#737973] font-normal">
+                            <div className="text-[10px] text-[var(--text-muted)] font-normal">
                               {tr.risk1R > 0 ? `${(tr.simPnl / tr.risk1R).toFixed(2)}R` : '-'}
                             </div>
                           </td>
 
                           {/* PnL Thực Tế */}
-                          <td className="py-1.5 px-2 text-right font-mono">
-                            <span className={isActualWin ? 'text-emerald-400' : isActualLoss ? 'text-rose-400' : 'text-[#737973]'}>
+                          <td className="py-2 px-2 text-right font-mono text-xs font-medium">
+                            <span className={isActualWin ? 'text-[#4a6152]' : isActualLoss ? 'text-[#825249]' : 'text-[var(--text-muted)]'}>
                               {tr.net >= 0 ? '+' : ''}${tr.net.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
-                            <div className="text-[9px] text-[#737973] font-normal">
+                            <div className="text-[10px] text-[var(--text-muted)] font-normal">
                               {tr.risk1R > 0 ? `${(tr.net / tr.risk1R).toFixed(2)}R` : '-'}
                             </div>
                           </td>
 
                           {/* Chênh Lệch */}
-                          <td className="py-1.5 px-2.5 text-right font-mono font-bold">
+                          <td className="py-2 px-3 text-right font-mono text-xs font-medium">
                             <span className={`px-1.5 py-0.5 rounded text-[10px] border ${
                               isBetter
-                                ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                                ? 'bg-[#4a6152]/10 text-[var(--color-win)] border-[#4a6152]/30 font-semibold'
                                 : isWorse
-                                ? 'bg-rose-500/10 text-rose-300 border-rose-500/30'
-                                : 'bg-[#ede7df] text-[#737973] border-[#e8e2da]'
+                                ? 'bg-[#825249]/10 text-[var(--color-loss)] border-[#825249]/30 font-semibold'
+                                : 'bg-[var(--bg-subtle)] text-[var(--text-muted)] border border-[var(--border-main)]'
                             }`}>
                               {tr.delta >= 0 ? '+' : ''}${tr.delta.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
@@ -6528,15 +6500,15 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
             </div>
 
             {/* Phân trang (Pagination footer phong cách HistoryTable) */}
-            <div className="px-3 py-2 bg-[#ede7df] border border-[#e8e2da] rounded-xl flex items-center justify-between gap-3 flex-wrap">
+            <div className="px-4 py-2 bg-[var(--bg-card)] border-t border-[var(--border-main)] flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2">
-                <span className="text-[10px] text-[#737973] font-mono">
+                <span className="text-[11px] text-[#1d1b17] font-mono">
                   Showing {filteredPartialTrades.length === 0 ? 0 : (safePartialPage - 1) * effectivePartialPageSize + 1}-{Math.min(safePartialPage * effectivePartialPageSize, filteredPartialTrades.length)} of {filteredPartialTrades.length} orders
                 </span>
 
-                {/* Rows per page pills - nhỏ lại và màu xám */}
-                <div className="hidden sm:flex items-center gap-1 text-[10px] ml-2">
-                  <span className="text-[#737973] text-[10px]">Page size:</span>
+                {/* Rows per page pills */}
+                <div className="hidden sm:flex items-center gap-1 text-xs ml-2">
+                  <span className="text-[#1d1b17] font-medium text-[11px]">Page size:</span>
                   {[5, 10, 20, 50].map((sz) => (
                     <button
                       key={sz}
@@ -6545,10 +6517,10 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                         setPartialPageSize(sz);
                         setPartialPage(1);
                       }}
-                      className={`px-1.5 py-0.2 rounded text-[10px] font-mono transition-colors cursor-pointer ${
+                      className={`px-2 py-0.5 rounded text-[11px] font-mono transition-colors cursor-pointer ${
                         partialPageSize === sz
-                          ? 'bg-[#e8e2da] text-[#424843] font-bold border border-[#e8e2da]'
-                          : 'text-[#737973] hover:text-[#424843] hover:bg-[#e8e2da]'
+                          ? 'bg-[#e8e2da] text-[#1d1b17] font-bold border border-[#d8d0c5]'
+                          : 'text-[var(--text-muted)] hover:text-[#1d1b17] hover:bg-[#e8e2da]'
                       }`}
                     >
                       {sz}
@@ -6560,10 +6532,10 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                       setPartialPageSize(0);
                       setPartialPage(1);
                     }}
-                    className={`px-1.5 py-0.2 rounded text-[10px] font-mono transition-colors cursor-pointer ${
+                    className={`px-2 py-0.5 rounded text-[11px] font-mono transition-colors cursor-pointer ${
                       partialPageSize === 0
-                        ? 'bg-[#e8e2da] text-[#424843] font-bold border border-[#e8e2da]'
-                        : 'text-[#737973] hover:text-[#424843] hover:bg-[#e8e2da]'
+                        ? 'bg-[#e8e2da] text-[#1d1b17] font-bold border border-[#d8d0c5]'
+                        : 'text-[var(--text-muted)] hover:text-[#1d1b17] hover:bg-[#e8e2da]'
                     }`}
                   >
                     {language === 'vi' ? 'Tất cả' : 'All'}
@@ -6571,13 +6543,13 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                 </div>
               </div>
 
-              {/* Pagination buttons - thu nhỏ lại */}
+              {/* Pagination buttons */}
               <div className="flex items-center gap-1 font-mono text-[11px]">
                 <button
                   type="button"
                   disabled={safePartialPage <= 1}
                   onClick={() => setPartialPage(p => Math.max(1, p - 1))}
-                  className="w-5 h-5 rounded flex items-center justify-center bg-[#e8e2da] hover:bg-[#30363d] text-[#737973] hover:text-[#1d1b17] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors text-[10px] border border-[#e8e2da]"
+                  className="w-5 h-5 rounded flex items-center justify-center bg-[#ede7df] hover:bg-[#e8e2da] text-[#737973] hover:text-[#1d1b17] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors text-[10px] border border-[#d8d0c5]"
                   title="Previous page"
                 >
                   &lt;
@@ -6586,7 +6558,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                 {partialPaginationNumbers.map((pNum, idx) => {
                   if (pNum === -1) {
                     return (
-                      <span key={`ellipsis-${idx}`} className="w-3 text-center text-slate-600 text-[10px]">
+                      <span key={`ellipsis-${idx}`} className="w-3 text-center text-[#737973] text-[10px]">
                         ...
                       </span>
                     );
@@ -6599,8 +6571,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                       onClick={() => setPartialPage(pNum)}
                       className={`w-5 h-5 rounded flex items-center justify-center font-medium text-[10px] transition-colors cursor-pointer ${
                         isCur
-                          ? 'bg-[#30363d] text-[#1d1b17] font-bold border border-slate-500'
-                          : 'hover:bg-[#e8e2da] text-[#737973] hover:text-[#424843]'
+                          ? 'bg-[#e8e2da] text-[#1d1b17] font-bold border border-[#d8d0c5]'
+                          : 'hover:bg-[#e8e2da] text-[#737973] hover:text-[#1d1b17]'
                       }`}
                     >
                       {pNum}
@@ -6612,7 +6584,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                   type="button"
                   disabled={safePartialPage >= totalPartialPages}
                   onClick={() => setPartialPage(p => Math.min(totalPartialPages, p + 1))}
-                  className="w-5 h-5 rounded flex items-center justify-center bg-[#e8e2da] hover:bg-[#30363d] text-[#737973] hover:text-[#1d1b17] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors text-[10px] border border-[#e8e2da]"
+                  className="w-5 h-5 rounded flex items-center justify-center bg-[#ede7df] hover:bg-[#e8e2da] text-[#737973] hover:text-[#1d1b17] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors text-[10px] border border-[#d8d0c5]"
                   title="Next page"
                 >
                   &gt;
@@ -6637,19 +6609,14 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                 </span>
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase font-mono ${
                   psychologyQuantitativeData.psychScore >= 80
-                    ? 'bg-[#e8e2da] text-emerald-400 border-emerald-500/40'
+                    ? 'bg-[#e8e2da] text-[#4a6152] border-[#d8d0c5]'
                     : psychologyQuantitativeData.psychScore >= 60
                     ? 'bg-[#e8e2da] text-[#1d1b17] border-[#d8d0c5]'
-                    : 'bg-[#e8e2da] text-rose-400 border-rose-500/40'
+                    : 'bg-[#e8e2da] text-[#825249] border-[#d8d0c5]'
                 }`}>
                   {language === 'vi' ? 'Điểm Kỷ Luật:' : 'Mindset Score:'} {psychologyQuantitativeData.psychScore}/100
                 </span>
               </div>
-              <p className="text-xs text-[#737973] mt-0.5">
-                {language === 'vi'
-                  ? 'Quy chuẩn hóa 5 trụ cột tâm lý học giao dịch thành số học 100% dựa trên dữ liệu thật MT5: Đo lường khách quan tự mãn, sợ hãi, cay cú, mệt mỏi nhận thức và tính kiên nhẫn.'
-                  : 'Quantifying behavioral finance & trading psychology into 100% MT5 mathematical metrics.'}
-              </p>
             </div>
 
             <div className="flex items-center gap-2 text-[11px] font-mono text-[#737973] bg-[#ede7df] px-2.5 py-1 rounded-lg border border-[#e8e2da]">
@@ -6873,7 +6840,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                 {/* Cột 2: Kèo Bột Phát / Thiếu Chuẩn (<= 1 checklist) */}
                 <div className="p-3 bg-white shadow-[6px_8px_18px_rgba(125,110,95,0.08),inset_1px_1px_2px_rgba(255,255,255,0.95)] rounded-lg border border-[#e8e2da] space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-rose-400 uppercase">
+                    <span className="text-[11px] font-bold text-[var(--text-primary)] uppercase">
                       {language === 'vi' ? 'Kèo Bột Phát (≤1 Check)' : 'Impulse (≤1 Check)'}
                     </span>
                     <span className="text-[10px] font-mono text-[#737973]">
@@ -6923,10 +6890,10 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                 </span>
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase font-mono ${
                   postGreedPsychologyData.tiltSeverity === 'CRITICAL'
-                    ? 'bg-[#e8e2da] text-rose-400 border-rose-500/40'
+                    ? 'bg-[#e8e2da] text-[#825249] border-[#d8d0c5]'
                     : postGreedPsychologyData.tiltSeverity === 'ELEVATED'
                     ? 'bg-[#e8e2da] text-[#1d1b17] border-[#d8d0c5]'
-                    : 'bg-[#e8e2da] text-emerald-400 border-emerald-500/40'
+                    : 'bg-[#e8e2da] text-[#4a6152] border-[#d8d0c5]'
                 }`}>
                   {postGreedPsychologyData.tiltSeverity === 'CRITICAL' 
                     ? (language === 'vi' ? 'Báo Động: Cay Cú' : 'Critical Tilt Warning')
@@ -6935,11 +6902,6 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                     : (language === 'vi' ? 'Tâm Lý Ổn Định' : 'Controlled Mindset')}
                 </span>
               </div>
-              <p className="text-xs text-[#737973] mt-0.5">
-                {language === 'vi'
-                  ? 'Bóc tách các lệnh lãi đỉnh cao (MFE) nhưng chênh lệch quá lớn so với thực nhận ➔ Hậu quả tâm lý cay cú ở các lệnh kế tiếp.'
-                  : 'Auditing peak unrealized profit gaps held to BE/loss, followed by emotional drag on subsequent trades.'}
-              </p>
             </div>
 
             {/* Bộ điều khiển tương tác: Ngưỡng MFE, Tỷ Lệ Giữ Lãi, Thời Gian Gồng, Cửa sổ theo dõi */}
@@ -6956,8 +6918,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                     onClick={() => setPsychologyMfeThreshold(r)}
                     className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono transition-colors cursor-pointer ${
                       psychologyMfeThreshold === r
-                        ? 'bg-[#30363d] text-emerald-400 border border-emerald-500/40 shadow-xs'
-                        : 'text-[#737973] hover:bg-[#e8e2da] hover:text-emerald-400'
+                        ? 'bg-white text-[#1d1b17] font-bold border border-[#d8d0c5] shadow-xs'
+                        : 'text-[#737973] hover:bg-[#e8e2da] hover:text-[#4a6152]'
                     }`}
                   >
                     {r}R
@@ -6977,8 +6939,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                     onClick={() => setPsychologyCaptureRateMax(pct)}
                     className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono transition-colors cursor-pointer ${
                       psychologyCaptureRateMax === pct
-                        ? 'bg-[#30363d] text-emerald-400 border border-emerald-500/40 shadow-xs'
-                        : 'text-[#737973] hover:bg-[#e8e2da] hover:text-emerald-400'
+                        ? 'bg-white text-[#1d1b17] font-bold border border-[#d8d0c5] shadow-xs'
+                        : 'text-[#737973] hover:bg-[#e8e2da] hover:text-[#4a6152]'
                     }`}
                   >
                     {pct}%
@@ -7003,8 +6965,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                     onClick={() => setPsychologyMinHoldingMinutes(item.m)}
                     className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono transition-colors cursor-pointer ${
                       psychologyMinHoldingMinutes === item.m
-                        ? 'bg-[#30363d] text-emerald-400 border border-emerald-500/40 shadow-xs'
-                        : 'text-[#737973] hover:bg-[#e8e2da] hover:text-emerald-400'
+                        ? 'bg-white text-[#1d1b17] font-bold border border-[#d8d0c5] shadow-xs'
+                        : 'text-[#737973] hover:bg-[#e8e2da] hover:text-[#4a6152]'
                     }`}
                   >
                     {item.label}
@@ -7024,8 +6986,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                     onClick={() => setPsychologyWindowSize(w)}
                     className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono transition-colors cursor-pointer ${
                       psychologyWindowSize === w
-                        ? 'bg-[#30363d] text-emerald-400 border border-emerald-500/40 shadow-xs'
-                        : 'text-[#737973] hover:bg-[#e8e2da] hover:text-emerald-400'
+                        ? 'bg-white text-[#1d1b17] font-bold border border-[#d8d0c5] shadow-xs'
+                        : 'text-[#737973] hover:bg-[#e8e2da] hover:text-[#4a6152]'
                     }`}
                   >
                     +{w} {language === 'vi' ? 'lệnh' : 'trades'}
@@ -7129,7 +7091,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
 
           {/* Bảng Kiểm Toán Chi Tiết Từng Cú Hụt Ăn Kèm Diễn Biến Các Lệnh Kế Tiếp */}
           <div className="bg-[#ede7df] rounded-lg border border-[#e8e2da] overflow-hidden">
-            <div className="px-3.5 py-2.5 bg-[#212732] border-b border-[#e8e2da] flex items-center justify-between gap-3 flex-wrap">
+            <div className="px-3.5 py-2.5 bg-[#ede7df] border-b border-[#e8e2da] flex items-center justify-between gap-3 flex-wrap">
               <span className="font-bold text-[#1d1b17] text-xs tracking-wider uppercase font-sans">
                 {language === 'vi' ? 'DANH SÁCH KIỂM TOÁN TỪNG CÚ HỤT ĂN & DIỄN BIẾN LỆNH SAU ĐÓ' : 'AUDIT BREAKDOWN: GREED EVENTS & CONSECUTIVE TRADES'}
               </span>
@@ -7145,8 +7107,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                     onClick={() => setPsychologyPageSize(sz)}
                     className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono transition-colors cursor-pointer ${
                       psychologyPageSize === sz
-                        ? 'bg-[#30363d] text-emerald-400 border border-emerald-500/40'
-                        : 'text-[#737973] hover:bg-[#e8e2da] hover:text-emerald-400'
+                        ? 'bg-white text-[#1d1b17] font-bold border border-[#d8d0c5] shadow-xs'
+                        : 'text-[#737973] hover:bg-[#e8e2da] hover:text-[#4a6152]'
                     }`}
                   >
                     {sz === 0 ? (language === 'vi' ? 'Tất cả' : 'All') : sz}
@@ -7157,7 +7119,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-[#424843]">
-                <thead className="bg-[#1a202c] text-[#737973] text-[10px] uppercase font-semibold border-b border-[#e8e2da]">
+                <thead className="bg-white border-b border-[var(--border-main)] text-[var(--text-muted)] font-medium text-[11px] uppercase">
                   <tr>
                     <th className="px-3 py-2 text-center">#</th>
                     <th className="px-3 py-2">{language === 'vi' ? 'Lệnh Hụt Ăn' : 'Trigger Trade'}</th>
@@ -7170,7 +7132,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                     <th className="px-3 py-2 text-right">{language === 'vi' ? 'PnL Hậu Quả' : 'Post PnL'}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#252b35] font-mono text-[11px]">
+                <tbody className="divide-y divide-[#e8e2da] font-mono text-[11px]">
                   {paginatedPsychologyEvents.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="text-center py-6 text-[#737973] font-sans italic">
@@ -7189,26 +7151,26 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                       return (
                         <tr 
                           key={evt.triggerIndex} 
-                          className="hover:bg-[#e8e2da] hover:text-emerald-400 transition-colors cursor-pointer group"
+                          className="hover:bg-[#f6f2ec] transition-colors cursor-pointer group"
                           onClick={() => {
                             const rawTr = closedTrades.find(t => String(t.ticket || t.position_id) === String(tr.ticket));
                             if (rawTr && onSelectTrade) onSelectTrade(rawTr);
                           }}
                         >
-                          <td className="px-3 py-2.5 text-center text-[#737973] group-hover:text-emerald-400 font-medium">
+                          <td className="px-3 py-2.5 text-center text-[#737973] group-hover:text-[#4a6152] font-medium">
                             {evt.triggerIndex}
                           </td>
                           <td className="px-3 py-2.5 font-sans">
                             <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-[#1d1b17] group-hover:text-emerald-400">#{tr.ticket}</span>
+                              <span className="font-bold text-[#1d1b17] group-hover:text-[#4a6152]">#{tr.ticket}</span>
                               <span className="text-[10px] text-[#737973] font-mono">({tr.symbol})</span>
-                              <span className={`text-[9px] px-1 py-0.2 rounded font-bold ${tr.type === 'BUY' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              <span className={`text-[9px] px-1 py-0.2 rounded font-bold ${tr.type === 'BUY' ? 'text-emerald-500' : 'text-rose-500'}`}>
                                 {tr.type}
                               </span>
                             </div>
                           </td>
                           <td className="px-3 py-2.5 text-right">
-                            <span className="text-emerald-400 font-bold">
+                            <span className="text-[#4a6152] font-bold">
                               +{(evt.effectiveMaxR ?? 0).toFixed(2)}R
                             </span>
                             <span className="block text-[10px] text-[#737973]">
@@ -7216,7 +7178,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                             </span>
                           </td>
                           <td className="px-3 py-2.5 text-right">
-                            <span className={`font-bold ${tr.net > 1 ? 'text-emerald-400' : tr.net < -1 ? 'text-rose-400' : 'text-[#737973]'}`}>
+                            <span className={`font-bold ${tr.net > 1 ? 'text-[#4a6152]' : tr.net < -1 ? 'text-[#825249]' : 'text-[#737973]'}`}>
                               {tr.net >= 0 ? '+' : ''}${tr.net.toFixed(2)}
                             </span>
                             <span className="block text-[10px] text-[#737973]">
@@ -7227,10 +7189,10 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                           <td className="px-3 py-2.5 text-center">
                             <span className={`font-bold px-1.5 py-0.5 rounded text-[10px] border ${
                               evt.captureRatePercent <= 10 
-                                ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                                ? 'bg-rose-50 text-[#825249] border-rose-200'
                                 : evt.captureRatePercent <= 20
                                 ? 'bg-[#ede7df] text-[#1d1b17] border-[#d8d0c5]'
-                                : 'bg-white shadow-[6px_8px_18px_rgba(125,110,95,0.08),inset_1px_1px_2px_rgba(255,255,255,0.95)] text-[#424843] border-[#e8e2da]'
+                                : 'bg-white text-[#424843] border-[#e8e2da]'
                             }`}>
                               {(evt.captureRatePercent ?? 0).toFixed(1)}%
                             </span>
@@ -7256,20 +7218,20 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                             ) : (
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 {evt.followUps.map(fu => {
-                                  let bgClass = 'bg-white shadow-[6px_8px_18px_rgba(125,110,95,0.08),inset_1px_1px_2px_rgba(255,255,255,0.95)] text-[#424843] border-[#e8e2da]';
+                                  let bgClass = 'bg-[#ede7df] text-[var(--text-muted)] border-[#d8d0c5]';
                                   let label = 'BE';
                                   if (fu.isLoss) {
-                                    bgClass = 'bg-white shadow-[6px_8px_18px_rgba(125,110,95,0.08),inset_1px_1px_2px_rgba(255,255,255,0.95)] text-rose-400 border-rose-500/30 font-bold';
+                                    bgClass = 'bg-rose-50 text-[#825249] border-rose-200 font-bold';
                                     label = 'L';
                                   } else if (fu.isWin) {
-                                    bgClass = 'bg-white shadow-[6px_8px_18px_rgba(125,110,95,0.08),inset_1px_1px_2px_rgba(255,255,255,0.95)] text-emerald-400 border-emerald-500/30 font-bold';
+                                    bgClass = 'bg-emerald-50 text-[#4a6152] border-emerald-200 font-bold';
                                     label = 'W';
                                   }
                                   return (
                                     <span
                                       key={fu.ticket}
                                       title={`Lệnh #${fu.ticket} (${fu.symbol}): ${fu.net >= 0 ? '+' : ''}$${fu.net.toFixed(2)}`}
-                                      className={`px-1.5 py-0.5 rounded text-[10px] font-mono border hover:bg-[#30363d] cursor-help transition-colors ${bgClass}`}
+                                      className={`px-1.5 py-0.5 rounded text-[10px] font-mono border hover:bg-[#e8e2da] cursor-help transition-colors ${bgClass}`}
                                     >
                                       #{fu.ticket}: {label} ({fu.net >= 0 ? '+' : ''}${fu.net.toFixed(0)})
                                     </span>
@@ -7279,7 +7241,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                             )}
                           </td>
                           <td className="px-3 py-2.5 text-right">
-                            <span className={`font-bold ${evt.postEventLossRate >= 66 ? 'text-rose-400' : 'text-[#1d1b17]'}`}>
+                            <span className={`font-bold ${evt.postEventLossRate >= 66 ? 'text-[#825249]' : 'text-[#1d1b17]'}`}>
                               {evt.postEventLossRate}%
                             </span>
                             <span className="block text-[10px] text-[#737973]">
@@ -7287,7 +7249,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                             </span>
                           </td>
                           <td className="px-3 py-2.5 text-right font-bold">
-                            <span className={evt.followUpTotalPnlUsd >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                            <span className={evt.followUpTotalPnlUsd >= 0 ? 'text-[#4a6152]' : 'text-[#825249]'}>
                               {evt.followUpTotalPnlUsd >= 0 ? '+' : ''}${(evt.followUpTotalPnlUsd ?? 0).toFixed(2)}
                             </span>
                             <span className="block text-[10px] text-[#737973]">
@@ -7303,18 +7265,18 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
             </div>
 
             {/* Phân trang dưới đáy bảng */}
-            <div className="px-4 py-2 bg-[#1a202c] border-t border-[#e8e2da] flex items-center justify-between text-xs text-[#737973]">
+            <div className="px-4 py-2 bg-[var(--bg-card)] border-t border-[var(--border-main)] flex items-center justify-between text-xs text-[#737973]">
               <span className="text-[11px]">
                 {language === 'vi' ? 'Tổng cộng' : 'Total'}:{' '}
                 <strong className="text-[#1d1b17]">{postGreedPsychologyData.triggeredEvents.length}</strong> {language === 'vi' ? 'sự kiện hụt ăn' : 'events'}
               </span>
 
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 font-mono text-[11px]">
                 <button
                   type="button"
                   disabled={safePsychologyPage <= 1}
                   onClick={() => setPsychologyPage(p => Math.max(1, p - 1))}
-                  className="w-5 h-5 rounded flex items-center justify-center bg-[#e8e2da] hover:bg-[#30363d] text-[#737973] hover:text-[#1d1b17] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors text-[10px] border border-[#e8e2da]"
+                  className="w-5 h-5 rounded flex items-center justify-center bg-[#ede7df] hover:bg-[#e8e2da] text-[#737973] hover:text-[#1d1b17] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors text-[10px] border border-[#d8d0c5]"
                   title="Previous page"
                 >
                   &lt;
@@ -7323,7 +7285,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                 {psychologyPaginationNumbers.map((pNum, idx) => {
                   if (pNum === -1) {
                     return (
-                      <span key={`psy-ell-${idx}`} className="w-3 text-center text-slate-600 text-[10px]">
+                      <span key={`psy-ell-${idx}`} className="w-3 text-center text-[#737973] text-[10px]">
                         ...
                       </span>
                     );
@@ -7336,8 +7298,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                       onClick={() => setPsychologyPage(pNum)}
                       className={`w-5 h-5 rounded flex items-center justify-center font-medium text-[10px] transition-colors cursor-pointer ${
                         isCur
-                          ? 'bg-[#30363d] text-[#1d1b17] font-bold border border-slate-500'
-                          : 'hover:bg-[#e8e2da] text-[#737973] hover:text-[#424843]'
+                          ? 'bg-[#e8e2da] text-[#1d1b17] font-bold border border-[#d8d0c5]'
+                          : 'hover:bg-[#e8e2da] text-[#737973] hover:text-[#1d1b17]'
                       }`}
                     >
                       {pNum}
@@ -7349,7 +7311,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                   type="button"
                   disabled={safePsychologyPage >= totalPsychologyPages}
                   onClick={() => setPsychologyPage(p => Math.min(totalPsychologyPages, p + 1))}
-                  className="w-5 h-5 rounded flex items-center justify-center bg-[#e8e2da] hover:bg-[#30363d] text-[#737973] hover:text-[#1d1b17] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors text-[10px] border border-[#e8e2da]"
+                  className="w-5 h-5 rounded flex items-center justify-center bg-[#ede7df] hover:bg-[#e8e2da] text-[#737973] hover:text-[#1d1b17] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors text-[10px] border border-[#d8d0c5]"
                   title="Next page"
                 >
                   &gt;
@@ -7372,10 +7334,10 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                 </span>
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase font-mono ${
                   postEuphoriaPsychologyData.euphoriaSeverity === 'CRITICAL'
-                    ? 'bg-[#e8e2da] text-rose-400 border-rose-500/40'
+                    ? 'bg-[#e8e2da] text-[#825249] border-[#d8d0c5]'
                     : postEuphoriaPsychologyData.euphoriaSeverity === 'ELEVATED'
                     ? 'bg-[#e8e2da] text-[#1d1b17] border-[#d8d0c5]'
-                    : 'bg-[#e8e2da] text-emerald-400 border-emerald-500/40'
+                    : 'bg-[#e8e2da] text-[#4a6152] border-[#d8d0c5]'
                 }`}>
                   {postEuphoriaPsychologyData.euphoriaSeverity === 'CRITICAL' 
                     ? (language === 'vi' ? 'Báo Động: Hưng Phấn Quá Đà' : 'Critical Euphoria Warning')
@@ -7384,11 +7346,6 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                     : (language === 'vi' ? 'Kỷ Luật Vững Vàng' : 'Disciplined Win Follow-up')}
                 </span>
               </div>
-              <p className="text-xs text-[#737973] mt-0.5">
-                {language === 'vi'
-                  ? 'Bóc tách tâm lý chủ quan sau các lệnh thắng đậm: Đo lường xem sau khi ăn đủ TP thì độ hưng phấn có làm tăng tỷ lệ thua ở các lệnh kế tiếp không.'
-                  : 'Auditing overconfidence & discipline drift after big winning trades: Measuring subsequent trade performance.'}
-              </p>
             </div>
 
             {/* Bộ điều khiển tương tác: Ngưỡng Lãi Đủ TP, Tỷ Lệ Giữ Lãi, Cửa sổ theo dõi */}
@@ -7405,8 +7362,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                     onClick={() => setEuphoriaTpThresholdR(r)}
                     className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono transition-colors cursor-pointer ${
                       euphoriaTpThresholdR === r
-                        ? 'bg-[#30363d] text-emerald-400 border border-emerald-500/40 shadow-xs'
-                        : 'text-[#737973] hover:bg-[#e8e2da] hover:text-emerald-400'
+                        ? 'bg-white text-[#1d1b17] font-bold border border-[#d8d0c5] shadow-xs'
+                        : 'text-[#737973] hover:bg-[#e8e2da] hover:text-[#4a6152]'
                     }`}
                   >
                     {r}R
@@ -7426,8 +7383,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                     onClick={() => setEuphoriaCaptureRateMin(c)}
                     className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono transition-colors cursor-pointer ${
                       euphoriaCaptureRateMin === c
-                        ? 'bg-[#30363d] text-emerald-400 border border-emerald-500/40 shadow-xs'
-                        : 'text-[#737973] hover:bg-[#e8e2da] hover:text-emerald-400'
+                        ? 'bg-white text-[#1d1b17] font-bold border border-[#d8d0c5] shadow-xs'
+                        : 'text-[#737973] hover:bg-[#e8e2da] hover:text-[#4a6152]'
                     }`}
                   >
                     {c}%
@@ -7447,8 +7404,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                     onClick={() => setEuphoriaWindowSize(w)}
                     className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono transition-colors cursor-pointer ${
                       euphoriaWindowSize === w
-                        ? 'bg-[#30363d] text-emerald-400 border border-emerald-500/40 shadow-xs'
-                        : 'text-[#737973] hover:bg-[#e8e2da] hover:text-emerald-400'
+                        ? 'bg-white text-[#1d1b17] font-bold border border-[#d8d0c5] shadow-xs'
+                        : 'text-[#737973] hover:bg-[#e8e2da] hover:text-[#4a6152]'
                     }`}
                   >
                     +{w} {language === 'vi' ? 'lệnh' : 'trades'}
@@ -7552,7 +7509,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
 
           {/* Bảng Kiểm Toán Chi Tiết Từng Cú Thắng Đậm Kèm Diễn Biến Các Lệnh Kế Tiếp */}
           <div className="bg-[#ede7df] rounded-lg border border-[#e8e2da] overflow-hidden">
-            <div className="px-3.5 py-2.5 bg-[#212732] border-b border-[#e8e2da] flex items-center justify-between gap-3 flex-wrap">
+            <div className="px-3.5 py-2.5 bg-[#ede7df] border-b border-[#e8e2da] flex items-center justify-between gap-3 flex-wrap">
               <span className="font-bold text-[#1d1b17] text-xs tracking-wider uppercase font-sans">
                 {language === 'vi' ? 'DANH SÁCH KIỂM TOÁN TỪNG CÚ THẮNG ĐẬM & DIỄN BIẾN LỆNH SAU ĐÓ' : 'AUDIT BREAKDOWN: BIG WINS & SUBSEQUENT TRADES'}
               </span>
@@ -7568,8 +7525,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                     onClick={() => setEuphoriaPageSize(sz)}
                     className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono transition-colors cursor-pointer ${
                       euphoriaPageSize === sz
-                        ? 'bg-[#30363d] text-emerald-400 border border-emerald-500/40'
-                        : 'text-[#737973] hover:bg-[#e8e2da] hover:text-emerald-400'
+                        ? 'bg-white text-[#1d1b17] font-bold border border-[#d8d0c5] shadow-xs'
+                        : 'text-[#737973] hover:bg-[#e8e2da] hover:text-[#4a6152]'
                     }`}
                   >
                     {sz === 0 ? (language === 'vi' ? 'Tất cả' : 'All') : sz}
@@ -7580,7 +7537,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-[#424843]">
-                <thead className="bg-[#1a202c] text-[#737973] text-[10px] uppercase font-semibold border-b border-[#e8e2da]">
+                <thead className="bg-white border-b border-[var(--border-main)] text-[var(--text-muted)] font-medium text-[11px] uppercase">
                   <tr>
                     <th className="px-3 py-2 text-center">#</th>
                     <th className="px-3 py-2">{language === 'vi' ? 'Lệnh Thắng Đậm' : 'Big Win Trade'}</th>
@@ -7593,7 +7550,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                     <th className="px-3 py-2 text-right">{language === 'vi' ? 'PnL Kế Tiếp' : 'Post PnL'}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#252b35] font-mono text-[11px]">
+                <tbody className="divide-y divide-[#e8e2da] font-mono text-[11px]">
                   {paginatedEuphoriaEvents.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="text-center py-6 text-[#737973] font-sans italic">
@@ -7612,26 +7569,26 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                       return (
                         <tr 
                           key={evt.triggerIndex} 
-                          className="hover:bg-[#e8e2da] hover:text-emerald-400 transition-colors cursor-pointer group"
+                          className="hover:bg-[#f6f2ec] transition-colors cursor-pointer group"
                           onClick={() => {
                             const rawTr = closedTrades.find(t => String(t.ticket || t.position_id) === String(tr.ticket));
                             if (rawTr && onSelectTrade) onSelectTrade(rawTr);
                           }}
                         >
-                          <td className="px-3 py-2.5 text-center text-[#737973] group-hover:text-emerald-400 font-medium">
+                          <td className="px-3 py-2.5 text-center text-[#737973] group-hover:text-[#4a6152] font-medium">
                             {evt.triggerIndex}
                           </td>
                           <td className="px-3 py-2.5 font-sans">
                             <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-[#1d1b17] group-hover:text-emerald-400">#{tr.ticket}</span>
+                              <span className="font-bold text-[#1d1b17] group-hover:text-[#4a6152]">#{tr.ticket}</span>
                               <span className="text-[10px] text-[#737973] font-mono">({tr.symbol})</span>
-                              <span className={`text-[9px] px-1 py-0.2 rounded font-bold ${tr.type === 'BUY' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              <span className={`text-[9px] px-1 py-0.2 rounded font-bold ${tr.type === 'BUY' ? 'text-emerald-500' : 'text-rose-500'}`}>
                                 {tr.type}
                               </span>
                             </div>
                           </td>
                           <td className="px-3 py-2.5 text-right">
-                            <span className="text-emerald-400 font-bold">
+                            <span className="text-[#4a6152] font-bold">
                               +{(evt.actualR ?? 0).toFixed(2)}R
                             </span>
                             <span className="block text-[10px] text-[#737973]">
@@ -7648,7 +7605,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                           </td>
                           {/* CỘT TỶ LỆ GIỮ LÃI */}
                           <td className="px-3 py-2.5 text-right">
-                            <span className="text-emerald-400 font-bold">
+                            <span className="text-[#4a6152] font-bold">
                               {(evt.captureRatePercent ?? 0).toFixed(1)}%
                             </span>
                           </td>
@@ -7667,20 +7624,20 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                             ) : (
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 {evt.followUps.map(fu => {
-                                  let bgClass = 'bg-white shadow-[6px_8px_18px_rgba(125,110,95,0.08),inset_1px_1px_2px_rgba(255,255,255,0.95)] text-[#424843] border-[#e8e2da]';
+                                  let bgClass = 'bg-[#ede7df] text-[var(--text-muted)] border-[#d8d0c5]';
                                   let label = 'BE';
                                   if (fu.isLoss) {
-                                    bgClass = 'bg-white shadow-[6px_8px_18px_rgba(125,110,95,0.08),inset_1px_1px_2px_rgba(255,255,255,0.95)] text-rose-400 border-rose-500/30 font-bold';
+                                    bgClass = 'bg-rose-50 text-[#825249] border-rose-200 font-bold';
                                     label = 'L';
                                   } else if (fu.isWin) {
-                                    bgClass = 'bg-white shadow-[6px_8px_18px_rgba(125,110,95,0.08),inset_1px_1px_2px_rgba(255,255,255,0.95)] text-emerald-400 border-emerald-500/30 font-bold';
+                                    bgClass = 'bg-emerald-50 text-[#4a6152] border-emerald-200 font-bold';
                                     label = 'W';
                                   }
                                   return (
                                     <span
                                       key={fu.ticket}
                                       title={`Lệnh #${fu.ticket} (${fu.symbol}): ${fu.net >= 0 ? '+' : ''}$${fu.net.toFixed(2)}`}
-                                      className={`px-1.5 py-0.5 rounded text-[10px] font-mono border hover:bg-[#30363d] cursor-help transition-colors ${bgClass}`}
+                                      className={`px-1.5 py-0.5 rounded text-[10px] font-mono border hover:bg-[#e8e2da] cursor-help transition-colors ${bgClass}`}
                                     >
                                       #{fu.ticket}: {label} ({fu.net >= 0 ? '+' : ''}${fu.net.toFixed(0)})
                                     </span>
@@ -7690,7 +7647,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                             )}
                           </td>
                           <td className="px-3 py-2.5 text-right">
-                            <span className={`font-bold ${evt.postEventLossRate >= 66 ? 'text-rose-400' : 'text-[#1d1b17]'}`}>
+                            <span className={`font-bold ${evt.postEventLossRate >= 66 ? 'text-[#825249]' : 'text-[#1d1b17]'}`}>
                               {evt.postEventLossRate}%
                             </span>
                             <span className="block text-[10px] text-[#737973]">
@@ -7698,7 +7655,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                             </span>
                           </td>
                           <td className="px-3 py-2.5 text-right font-bold">
-                            <span className={evt.followUpTotalPnlUsd >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                            <span className={evt.followUpTotalPnlUsd >= 0 ? 'text-[#4a6152]' : 'text-[#825249]'}>
                               {evt.followUpTotalPnlUsd >= 0 ? '+' : ''}${(evt.followUpTotalPnlUsd ?? 0).toFixed(2)}
                             </span>
                             <span className="block text-[10px] text-[#737973]">
@@ -7714,18 +7671,18 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
             </div>
 
             {/* Phân trang dưới đáy bảng */}
-            <div className="px-4 py-2 bg-[#1a202c] border-t border-[#e8e2da] flex items-center justify-between text-xs text-[#737973]">
+            <div className="px-4 py-2 bg-[var(--bg-card)] border-t border-[var(--border-main)] flex items-center justify-between text-xs text-[#737973]">
               <span className="text-[11px]">
                 {language === 'vi' ? 'Tổng cộng' : 'Total'}:{' '}
                 <strong className="text-[#1d1b17]">{postEuphoriaPsychologyData.triggeredEvents.length}</strong> {language === 'vi' ? 'cú thắng đậm' : 'big win events'}
               </span>
 
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 font-mono text-[11px]">
                 <button
                   type="button"
                   disabled={safeEuphoriaPage <= 1}
                   onClick={() => setEuphoriaPage(p => Math.max(1, p - 1))}
-                  className="w-5 h-5 rounded flex items-center justify-center bg-[#e8e2da] hover:bg-[#30363d] text-[#737973] hover:text-[#1d1b17] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors text-[10px] border border-[#e8e2da]"
+                  className="w-5 h-5 rounded flex items-center justify-center bg-[#ede7df] hover:bg-[#e8e2da] text-[#737973] hover:text-[#1d1b17] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors text-[10px] border border-[#d8d0c5]"
                   title="Previous page"
                 >
                   &lt;
@@ -7734,7 +7691,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                 {euphoriaPaginationNumbers.map((pNum, idx) => {
                   if (pNum === -1) {
                     return (
-                      <span key={`eu-ell-${idx}`} className="w-3 text-center text-slate-600 text-[10px]">
+                      <span key={`eu-ell-${idx}`} className="w-3 text-center text-[#737973] text-[10px]">
                         ...
                       </span>
                     );
@@ -7747,8 +7704,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                       onClick={() => setEuphoriaPage(pNum)}
                       className={`w-5 h-5 rounded flex items-center justify-center font-medium text-[10px] transition-colors cursor-pointer ${
                         isCur
-                          ? 'bg-[#30363d] text-[#1d1b17] font-bold border border-slate-500'
-                          : 'hover:bg-[#e8e2da] text-[#737973] hover:text-[#424843]'
+                          ? 'bg-[#e8e2da] text-[#1d1b17] font-bold border border-[#d8d0c5]'
+                          : 'hover:bg-[#e8e2da] text-[#737973] hover:text-[#1d1b17]'
                       }`}
                     >
                       {pNum}
@@ -7760,7 +7717,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                   type="button"
                   disabled={safeEuphoriaPage >= totalEuphoriaPages}
                   onClick={() => setEuphoriaPage(p => Math.min(totalEuphoriaPages, p + 1))}
-                  className="w-5 h-5 rounded flex items-center justify-center bg-[#e8e2da] hover:bg-[#30363d] text-[#737973] hover:text-[#1d1b17] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors text-[10px] border border-[#e8e2da]"
+                  className="w-5 h-5 rounded flex items-center justify-center bg-[#ede7df] hover:bg-[#e8e2da] text-[#737973] hover:text-[#1d1b17] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors text-[10px] border border-[#d8d0c5]"
                   title="Next page"
                 >
                   &gt;
@@ -7783,10 +7740,10 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                 </span>
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase font-mono ${
                   postStreakClawbackData.clawbackSeverity === 'CRITICAL'
-                    ? 'bg-[#e8e2da] text-rose-400 border-rose-500/40'
+                    ? 'bg-[#e8e2da] text-[#825249] border-[#d8d0c5]'
                     : postStreakClawbackData.clawbackSeverity === 'ELEVATED'
                     ? 'bg-[#e8e2da] text-[#1d1b17] border-[#d8d0c5]'
-                    : 'bg-[#e8e2da] text-emerald-400 border-emerald-500/40'
+                    : 'bg-[#e8e2da] text-[#4a6152] border-[#d8d0c5]'
                 }`}>
                   {postStreakClawbackData.clawbackSeverity === 'CRITICAL' 
                     ? (language === 'vi' ? 'Báo Động: Bị Rút Lại > 50%' : 'Critical Clawback Drag')
@@ -7795,11 +7752,6 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                     : (language === 'vi' ? 'Giữ Thành Quả Tốt' : 'Profit Retained')}
                 </span>
               </div>
-              <p className="text-xs text-[#737973] mt-0.5">
-                {language === 'vi'
-                  ? 'Kiểm toán độ giữ thành quả sau chuỗi thắng: Đo lường xem sau khi thắng liên tiếp thì trader có bị trả lại tiền cho sàn ở các lệnh kế tiếp do tự tin thái quá không.'
-                  : 'Auditing profit retention after consecutive win streaks: Measuring drawdown immediately after streaks.'}
-              </p>
             </div>
 
             {/* Bộ điều khiển tương tác */}
@@ -7816,8 +7768,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                     onClick={() => setStreakClawbackMinStreak(stk)}
                     className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono transition-colors cursor-pointer ${
                       streakClawbackMinStreak === stk
-                        ? 'bg-[#30363d] text-emerald-400 border border-emerald-500/40 shadow-xs'
-                        : 'text-[#737973] hover:bg-[#e8e2da] hover:text-emerald-400'
+                        ? 'bg-white text-[#1d1b17] font-bold border border-[#d8d0c5] shadow-xs'
+                        : 'text-[#737973] hover:bg-[#e8e2da] hover:text-[#4a6152]'
                     }`}
                   >
                     {stk} {language === 'vi' ? 'lệnh' : 'trades'}
@@ -7837,8 +7789,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                     onClick={() => setStreakClawbackWindowSize(w)}
                     className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono transition-colors cursor-pointer ${
                       streakClawbackWindowSize === w
-                        ? 'bg-[#30363d] text-emerald-400 border border-emerald-500/40 shadow-xs'
-                        : 'text-[#737973] hover:bg-[#e8e2da] hover:text-emerald-400'
+                        ? 'bg-white text-[#1d1b17] font-bold border border-[#d8d0c5] shadow-xs'
+                        : 'text-[#737973] hover:bg-[#e8e2da] hover:text-[#4a6152]'
                     }`}
                   >
                     +{w} {language === 'vi' ? 'lệnh' : 'trades'}
@@ -7939,7 +7891,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
 
           {/* Bảng Kiểm Toán Chi Tiết Từng Chuỗi Thắng */}
           <div className="bg-[#ede7df] rounded-lg border border-[#e8e2da] overflow-hidden">
-            <div className="px-3.5 py-2.5 bg-[#212732] border-b border-[#e8e2da] flex items-center justify-between gap-3 flex-wrap">
+            <div className="px-3.5 py-2.5 bg-[#ede7df] border-b border-[#e8e2da] flex items-center justify-between gap-3 flex-wrap">
               <span className="font-bold text-[#1d1b17] text-xs tracking-wider uppercase font-sans">
                 {language === 'vi' ? 'DANH SÁCH KIỂM TOÁN TỪNG CHUỖI THẮNG & MỨC ĐỘ RÚT LẠI TIỀN' : 'AUDIT BREAKDOWN: WIN STREAKS & CLAWBACK LOSS'}
               </span>
@@ -7955,8 +7907,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                     onClick={() => setStreakClawbackPageSize(sz)}
                     className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono transition-colors cursor-pointer ${
                       streakClawbackPageSize === sz
-                        ? 'bg-[#30363d] text-emerald-400 border border-emerald-500/40'
-                        : 'text-[#737973] hover:bg-[#e8e2da] hover:text-emerald-400'
+                        ? 'bg-white text-[#1d1b17] font-bold border border-[#d8d0c5] shadow-xs'
+                        : 'text-[#737973] hover:bg-[#e8e2da] hover:text-[#4a6152]'
                     }`}
                   >
                     {sz === 0 ? (language === 'vi' ? 'Tất cả' : 'All') : sz}
@@ -7967,7 +7919,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-[#424843]">
-                <thead className="bg-[#1a202c] text-[#737973] text-[10px] uppercase font-semibold border-b border-[#e8e2da]">
+                <thead className="bg-white border-b border-[var(--border-main)] text-[var(--text-muted)] font-medium text-[11px] uppercase">
                   <tr>
                     <th className="px-3 py-2 text-center">#</th>
                     <th className="px-3 py-2">{language === 'vi' ? 'Chuỗi Thắng' : 'Win Streak'}</th>
@@ -7979,7 +7931,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                     <th className="px-3 py-2 text-right">{language === 'vi' ? 'Bị Rút Lại' : 'Clawback %'}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#252b35] font-mono text-[11px]">
+                <tbody className="divide-y divide-[#e8e2da] font-mono text-[11px]">
                   {paginatedStreakClawbackEvents.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="text-center py-6 text-[#737973] font-sans italic">
@@ -7993,14 +7945,14 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                       return (
                         <tr 
                           key={`sc-${evt.streakStartIndex}-${evt.streakEndIndex}`} 
-                          className="hover:bg-[#e8e2da] hover:text-emerald-400 transition-colors cursor-pointer group"
+                          className="hover:bg-[#f6f2ec] transition-colors cursor-pointer group"
                         >
-                          <td className="px-3 py-2.5 text-center text-[#737973] group-hover:text-emerald-400 font-medium">
+                          <td className="px-3 py-2.5 text-center text-[#737973] group-hover:text-[#4a6152] font-medium">
                             {eIdx + 1}
                           </td>
                           <td className="px-3 py-2.5 font-sans">
                             <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-[#1d1b17] group-hover:text-emerald-400">
+                              <span className="font-bold text-[#1d1b17] group-hover:text-[#4a6152]">
                                 {evt.streakLength} {language === 'vi' ? 'lệnh thắng liên tiếp' : 'wins in a row'}
                               </span>
                               <span className="text-[10px] text-[#737973] font-mono">
@@ -8008,7 +7960,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                               </span>
                             </div>
                           </td>
-                          <td className="px-3 py-2.5 text-right font-bold text-emerald-400">
+                          <td className="px-3 py-2.5 text-right font-bold text-[#4a6152]">
                             +${evt.streakTotalUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             <span className="block text-[10px] text-[#737973] font-normal">
                               +{(evt.streakTotalR ?? 0).toFixed(2)}R
@@ -8020,7 +7972,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                                 <span
                                   key={st.ticket}
                                   title={`#${st.ticket} (${st.symbol}): +$${st.net.toFixed(2)}`}
-                                  className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-[#ede7df] text-emerald-400 border border-[#e8e2da]"
+                                  className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-white text-[#4a6152] border border-[#d8d0c5]"
                                 >
                                   #{st.ticket}
                                 </span>
@@ -8036,20 +7988,20 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                             ) : (
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 {evt.followUps.map(fu => {
-                                  let bgClass = 'bg-white shadow-[6px_8px_18px_rgba(125,110,95,0.08),inset_1px_1px_2px_rgba(255,255,255,0.95)] text-[#424843] border-[#e8e2da]';
+                                  let bgClass = 'bg-[#ede7df] text-[var(--text-muted)] border-[#d8d0c5]';
                                   let label = 'BE';
                                   if (fu.isLoss) {
-                                    bgClass = 'bg-white shadow-[6px_8px_18px_rgba(125,110,95,0.08),inset_1px_1px_2px_rgba(255,255,255,0.95)] text-rose-400 border-rose-500/30 font-bold';
+                                    bgClass = 'bg-rose-50 text-[#825249] border-rose-200 font-bold';
                                     label = 'L';
                                   } else if (fu.isWin) {
-                                    bgClass = 'bg-white shadow-[6px_8px_18px_rgba(125,110,95,0.08),inset_1px_1px_2px_rgba(255,255,255,0.95)] text-emerald-400 border-emerald-500/30 font-bold';
+                                    bgClass = 'bg-emerald-50 text-[#4a6152] border-emerald-200 font-bold';
                                     label = 'W';
                                   }
                                   return (
                                     <span
                                       key={fu.ticket}
                                       title={`Lệnh #${fu.ticket} (${fu.symbol}): ${fu.net >= 0 ? '+' : ''}$${fu.net.toFixed(2)}`}
-                                      className={`px-1.5 py-0.5 rounded text-[10px] font-mono border hover:bg-[#30363d] cursor-help transition-colors ${bgClass}`}
+                                      className={`px-1.5 py-0.5 rounded text-[10px] font-mono border hover:bg-[#e8e2da] cursor-help transition-colors ${bgClass}`}
                                     >
                                       #{fu.ticket}: {label} ({fu.net >= 0 ? '+' : ''}${fu.net.toFixed(0)})
                                     </span>
@@ -8059,7 +8011,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                             )}
                           </td>
                           <td className="px-3 py-2.5 text-right">
-                            <span className={`font-bold ${evt.postEventLossRate >= 66 ? 'text-rose-400' : 'text-[#1d1b17]'}`}>
+                            <span className={`font-bold ${evt.postEventLossRate >= 66 ? 'text-[#825249]' : 'text-[#1d1b17]'}`}>
                               {evt.postEventLossRate}%
                             </span>
                             <span className="block text-[10px] text-[#737973]">
@@ -8067,7 +8019,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                             </span>
                           </td>
                           <td className="px-3 py-2.5 text-right font-bold">
-                            <span className={evt.followUpTotalPnlUsd >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                            <span className={evt.followUpTotalPnlUsd >= 0 ? 'text-[#4a6152]' : 'text-[#825249]'}>
                               {evt.followUpTotalPnlUsd >= 0 ? '+' : ''}${(evt.followUpTotalPnlUsd ?? 0).toFixed(2)}
                             </span>
                             <span className="block text-[10px] text-[#737973]">
@@ -8075,7 +8027,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                             </span>
                           </td>
                           <td className="px-3 py-2.5 text-right">
-                            <span className={`font-bold ${evt.clawbackPercent >= 50 ? 'text-rose-400' : evt.clawbackPercent >= 25 ? 'text-[#1d1b17]' : 'text-emerald-400'}`}>
+                            <span className={`font-bold ${evt.clawbackPercent >= 50 ? 'text-[#825249]' : evt.clawbackPercent >= 25 ? 'text-[#1d1b17]' : 'text-[#4a6152]'}`}>
                               {evt.clawbackPercent}%
                             </span>
                           </td>
@@ -8088,18 +8040,18 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
             </div>
 
             {/* Phân trang dưới đáy bảng */}
-            <div className="px-4 py-2 bg-[#1a202c] border-t border-[#e8e2da] flex items-center justify-between text-xs text-[#737973]">
+            <div className="px-4 py-2 bg-[var(--bg-card)] border-t border-[var(--border-main)] flex items-center justify-between text-xs text-[#737973]">
               <span className="text-[11px]">
                 {language === 'vi' ? 'Tổng cộng' : 'Total'}:{' '}
                 <strong className="text-[#1d1b17]">{postStreakClawbackData.triggeredEvents.length}</strong> {language === 'vi' ? 'chuỗi thắng' : 'win streaks'}
               </span>
 
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 font-mono text-[11px]">
                 <button
                   type="button"
                   disabled={safeStreakClawbackPage <= 1}
                   onClick={() => setStreakClawbackPage(p => Math.max(1, p - 1))}
-                  className="w-5 h-5 rounded flex items-center justify-center bg-[#e8e2da] hover:bg-[#30363d] text-[#737973] hover:text-[#1d1b17] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors text-[10px] border border-[#e8e2da]"
+                  className="w-5 h-5 rounded flex items-center justify-center bg-[#ede7df] hover:bg-[#e8e2da] text-[#737973] hover:text-[#1d1b17] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors text-[10px] border border-[#d8d0c5]"
                   title="Previous page"
                 >
                   &lt;
@@ -8108,7 +8060,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                 {streakClawbackPaginationNumbers.map((pNum, idx) => {
                   if (pNum === -1) {
                     return (
-                      <span key={`sc-ell-${idx}`} className="w-3 text-center text-slate-600 text-[10px]">
+                      <span key={`sc-ell-${idx}`} className="w-3 text-center text-[#737973] text-[10px]">
                         ...
                       </span>
                     );
@@ -8121,8 +8073,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                       onClick={() => setStreakClawbackPage(pNum)}
                       className={`w-5 h-5 rounded flex items-center justify-center font-medium text-[10px] transition-colors cursor-pointer ${
                         isCur
-                          ? 'bg-[#30363d] text-[#1d1b17] font-bold border border-slate-500'
-                          : 'hover:bg-[#e8e2da] text-[#737973] hover:text-[#424843]'
+                          ? 'bg-[#e8e2da] text-[#1d1b17] font-bold border border-[#d8d0c5]'
+                          : 'hover:bg-[#e8e2da] text-[#737973] hover:text-[#1d1b17]'
                       }`}
                     >
                       {pNum}
@@ -8134,7 +8086,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
                   type="button"
                   disabled={safeStreakClawbackPage >= totalStreakClawbackPages}
                   onClick={() => setStreakClawbackPage(p => Math.min(totalStreakClawbackPages, p + 1))}
-                  className="w-5 h-5 rounded flex items-center justify-center bg-[#e8e2da] hover:bg-[#30363d] text-[#737973] hover:text-[#1d1b17] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors text-[10px] border border-[#e8e2da]"
+                  className="w-5 h-5 rounded flex items-center justify-center bg-[#ede7df] hover:bg-[#e8e2da] text-[#737973] hover:text-[#1d1b17] disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer transition-colors text-[10px] border border-[#d8d0c5]"
                   title="Next page"
                 >
                   &gt;

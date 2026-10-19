@@ -345,47 +345,22 @@ export const EconomicCalendarMini: React.FC = () => {
       <div className="px-3 py-2 bg-[var(--bg-card)] border-b border-[var(--border-main)] rounded-t-2xl flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-1.5">
           {/* LỊCH KINH TẾ MÀU ĐEN CHUẨN TERMINAL */}
-          <span className="font-bold text-[#1d1b17] text-xs uppercase tracking-wider">
+          <span className="font-bold text-[var(--text-primary)] text-xs uppercase tracking-wider">
             LỊCH KINH TẾ
           </span>
         </div>
 
         <div className="flex items-center gap-1.5 relative z-30">
-          {/* NÚT CHUYỂN NHANH TUẦN / HÔM NAY ĐƯA RA NGOÀI */}
-          <div className="flex items-center clay-well p-0.5 rounded-full border border-[var(--border-main)]/50">
-            <button
-              type="button"
-              onClick={() => handleToggleTimeFilter('WEEK')}
-              className={`px-2 py-0.5 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${
-                timeFilter === 'WEEK'
-                  ? 'clay-pill text-[#1d1b17] font-bold bg-white shadow-xs'
-                  : 'text-[var(--text-muted)] hover:text-[#1d1b17]'
-              }`}
-            >
-              Tuần Này
-            </button>
-            <button
-              type="button"
-              onClick={() => handleToggleTimeFilter('TODAY')}
-              className={`px-2 py-0.5 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${
-                timeFilter === 'TODAY'
-                  ? 'clay-pill text-[#1d1b17] font-bold bg-white shadow-xs'
-                  : 'text-[var(--text-muted)] hover:text-[#1d1b17]'
-              }`}
-            >
-              Hôm Nay
-            </button>
-          </div>
 
           {/* BỘ NÚT TÙY CHỌN & TẢI LẠI THEO CHUẨN CLAY-PILL */}
           <div className="flex items-center clay-well p-0.5 rounded-full border border-[var(--border-main)]/50">
             <button
               type="button"
               onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-              className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${
+              className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all cursor-pointer ${
                 isSettingsOpen
-                  ? 'clay-pill text-[#1d1b17] font-bold bg-white'
-                  : 'text-[var(--text-muted)] hover:text-[#1d1b17]'
+                  ? 'clay-pill text-[var(--text-primary)] font-bold bg-white'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
               Tùy Chọn
@@ -394,7 +369,7 @@ export const EconomicCalendarMini: React.FC = () => {
               type="button"
               onClick={fetchCalendar}
               disabled={isLoading}
-              className="p-1 rounded-full text-[var(--text-muted)] hover:text-[#1d1b17] hover:bg-white/80 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center"
+              className="p-1 rounded-full text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/80 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center"
               title="Tải lại lịch kinh tế"
             >
               <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
@@ -604,19 +579,19 @@ export const EconomicCalendarMini: React.FC = () => {
       {/* DANH SÁCH BẢNG TIN TỨC: CỐ ĐỊNH CHUẨN XÁC 3 TIN, KHÔNG BỊ CẮT LỬNG LƠ TIN THỨ 4 */}
       <div className="h-[164px] max-h-[164px] overflow-y-auto overflow-x-hidden p-0 rounded-b-2xl">
         <table className="w-full table-fixed border-collapse text-left text-xs font-sans">
-          {/* HEADER MENU: TÔ CHỮ MÀU XÁM [var(--text-muted)], KHÔNG NỀN (transparent) GIỐNG BẢNG LỊCH SỬ */}
+          {/* HEADER MENU: CHUẨN NHƯ BẢNG LỊCH SỬ (text-[var(--text-muted)] font-medium uppercase text-[11px]) */}
           <thead>
-            <tr className="h-[32px] border-b border-[var(--border-main)] text-[10px] font-mono font-medium text-[var(--text-muted)] uppercase select-none sticky top-0 z-10 bg-white">
-              <th className="py-1.5 pl-3 pr-1 w-[28%] font-medium">Thời Gian</th>
-              <th className="py-1.5 px-1 w-[18%] text-center font-medium">Đồng</th>
-              <th className="py-1.5 px-2 w-[34%] font-medium">Sự Kiện</th>
+            <tr className="h-[32px] border-b border-[var(--border-main)] text-[11px] font-mono font-medium text-[var(--text-muted)] uppercase select-none sticky top-0 z-10 bg-white">
+              <th className="py-1.5 pl-3 pr-1 w-[26%] font-medium">Thời Gian</th>
+              <th className="py-1.5 px-1 w-[16%] text-center font-medium">Đồng</th>
+              <th className="py-1.5 px-2 w-[38%] font-medium">Sự Kiện</th>
               <th className="py-1.5 pr-3 pl-1 w-[20%] text-right font-medium">Đếm Ngược</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border-subtle)]/70 text-xs">
             {isLoading && (
               <tr className="h-[132px]">
-                <td colSpan={4} className="py-4 text-center text-[#1d1b17] text-xs font-mono">
+                <td colSpan={4} className="py-4 text-center text-[var(--text-muted)] text-xs font-mono">
                   Đang tải dữ liệu lịch kinh tế...
                 </td>
               </tr>
@@ -624,7 +599,7 @@ export const EconomicCalendarMini: React.FC = () => {
 
             {!isLoading && filteredEvents.length === 0 && (
               <tr className="h-[132px]">
-                <td colSpan={4} className="py-4 text-center text-[#1d1b17] text-xs">
+                <td colSpan={4} className="py-4 text-center text-[var(--text-muted)] text-xs">
                   <div className="flex flex-col items-center justify-center gap-1.5">
                     <span>Không có tin tức nào phù hợp bộ lọc hiện tại.</span>
                     <button
@@ -639,7 +614,7 @@ export const EconomicCalendarMini: React.FC = () => {
                           localStorage.removeItem('deal_calendar_currencies');
                         } catch {}
                       }}
-                      className="px-2.5 py-1 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-main)] text-[11px] font-semibold text-[#1d1b17] hover:bg-white transition-all cursor-pointer shadow-xs"
+                      className="px-2.5 py-1 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-main)] text-[11px] font-medium text-[var(--text-primary)] hover:bg-white transition-all cursor-pointer shadow-xs"
                     >
                       Bấm vào đây để hiện toàn bộ tin tuần này ({events.length} tin)
                     </button>
@@ -655,57 +630,51 @@ export const EconomicCalendarMini: React.FC = () => {
                 const isPast = mins < -30;
                 const isHoliday = isHolidayEvent(ev);
 
-                // Xác định viền màu theo mức độ tác động của tin
-                let currencyBorderClass = 'border-gray-400 border text-[#1d1b17] bg-gray-50/20';
+                // Xác định viền màu theo mức độ tác động của tin - chuẩn tab History (chữ luôn là text-primary)
+                let currencyBorderClass = 'border border-[var(--border-main)] text-[var(--text-primary)] bg-[var(--bg-subtle)]/50';
                 if (ev.impact === 'High') {
-                  currencyBorderClass = 'border-rose-500 border text-[#1d1b17] bg-rose-50/20';
+                  currencyBorderClass = 'border border-rose-300/70 text-[var(--text-primary)] bg-rose-50/25';
                 } else if (ev.impact === 'Medium') {
-                  currencyBorderClass = 'border-amber-500 border text-[#1d1b17] bg-amber-50/20';
-                } else if (isHoliday) {
-                  currencyBorderClass = 'border-gray-400 border text-[#1d1b17] bg-gray-50/20';
+                  currencyBorderClass = 'border border-amber-300/70 text-[var(--text-primary)] bg-amber-50/25';
                 }
 
                 return (
                   <tr
                     key={`${ev.date}-${ev.country}-${ev.title}-${idx}`}
-                    className={`h-[44px] transition-colors select-none ${
-                      isPast
-                        ? 'opacity-60 hover:opacity-100 hover:bg-[var(--bg-subtle)]/40 hover:text-emerald-700'
-                        : 'hover:bg-[var(--bg-subtle)]/40 hover:text-emerald-700'
-                    }`}
+                    className="h-[44px] transition-colors select-none text-[var(--text-primary)] hover:bg-[var(--table-row-hover)] hover:text-emerald-700 cursor-pointer"
                   >
-                    {/* THỜI GIAN: THỨ NGÀY Ở TRÊN, GIỜ PHÚT Ở DƯỚI */}
-                    <td className="py-1 pl-3 pr-1 font-mono text-[11px] whitespace-nowrap">
+                    {/* THỜI GIAN: GIỜ PHÚT Ở TRÊN (text-primary), THỨ NGÀY Ở DƯỚI (text-muted) */}
+                    <td className="py-1.5 pl-3 pr-1 font-mono text-[11px] whitespace-nowrap">
                       <div className="flex flex-col leading-tight">
-                        <span className="text-[10px] text-[#1d1b17] font-semibold">{dateStr}</span>
-                        <span className="font-bold text-[#1d1b17] text-[11px]">{isHoliday ? 'Cả ngày' : timeStr}</span>
+                        <span className="font-medium text-[var(--text-primary)] text-xs">{isHoliday ? 'Cả ngày' : timeStr}</span>
+                        <span className="text-[10px] text-[var(--text-muted)] font-mono mt-0.5">{dateStr}</span>
                       </div>
                     </td>
 
-                    {/* ĐỒNG: CHỮ MÀU ĐEN, VIỀN THEO MỨC ĐỘ TIN (ĐỎ, CAM, XÁM) */}
-                    <td className="py-1 px-1 text-center whitespace-nowrap">
-                      <span className={`px-1.5 py-0.2 rounded font-mono font-bold text-[11px] inline-block text-center min-w-[38px] ${currencyBorderClass}`}>
+                    {/* ĐỒNG: GỌN GÀNG, VIỀN MÀU THEO MỨC ĐỘ TIN */}
+                    <td className="py-1.5 px-1 text-center whitespace-nowrap">
+                      <span className={`px-1.5 py-0.5 rounded font-mono text-[11px] inline-block text-center min-w-[36px] ${currencyBorderClass}`}>
                         {ev.country}
                       </span>
                     </td>
 
-                    {/* SỰ KIỆN: TRUNCATE KHÔNG LÀM VỠ KHUNG */}
-                    <td className="py-1 px-2 font-medium text-[#1d1b17] text-xs truncate">
+                    {/* SỰ KIỆN: FONT MEDIUM CHUẨN text-[var(--text-primary)] */}
+                    <td className="py-1.5 px-2 font-medium text-[var(--text-primary)] text-xs truncate">
                       {ev.title}
                     </td>
 
-                    {/* ĐẾM NGƯỢC */}
-                    <td className="py-1 pr-3 pl-1 text-right font-mono text-[11px] text-[#1d1b17] whitespace-nowrap">
+                    {/* ĐẾM NGƯỢC: CHUẨN MÀU PHỤ text-[var(--text-muted)] */}
+                    <td className="py-1.5 pr-3 pl-1 text-right font-mono text-[11px] text-[var(--text-muted)] whitespace-nowrap">
                       {isHoliday ? (
-                        <span className="text-[#1d1b17]">Nghỉ lễ</span>
+                        <span>Nghỉ lễ</span>
                       ) : isPast ? (
                         <span>Đã ra</span>
                       ) : mins >= 0 && mins <= 60 ? (
-                        <span className="font-bold border border-rose-500 px-1 py-0.2 rounded text-[10px]">
+                        <span className="font-medium text-[var(--text-primary)] border border-rose-300/80 px-1.5 py-0.5 rounded text-[10px] bg-rose-50/25">
                           Còn {mins}p
                         </span>
                       ) : mins > 60 && mins < 1440 ? (
-                        <span className="font-semibold">
+                        <span className="font-medium text-[var(--text-primary)]">
                           {Math.floor(mins / 60)}h{mins % 60}p
                         </span>
                       ) : (

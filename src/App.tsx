@@ -764,9 +764,31 @@ export default function App() {
         });
 
         rawClosedTradesRef.current = closedRaw;
+
+        // Tập hợp tất cả position_id và ticket đã đóng (CLOSED) để đối soát
+        const closedTicketAndPosSet = new Set<string>();
+        closedRaw.forEach(c => {
+          if (c.ticket) closedTicketAndPosSet.add(String(c.ticket).trim());
+          if (c.position_id) closedTicketAndPosSet.add(String(c.position_id).trim());
+        });
+
         const pendingOrOpenRaw = data.filter(d => {
           const st = (d.status || '').toUpperCase().trim();
-          return st === 'PENDING_PLAN' || st === 'OPEN' || st === 'PENDING';
+          const isPendingOrOpen = st === 'PENDING_PLAN' || st === 'OPEN' || st === 'PENDING';
+          if (!isPendingOrOpen) return false;
+
+          // Bỏ qua nếu lệnh mang trạng thái đã hủy hoặc xóa
+          if (st === 'CANCELED' || st === 'CANCELLED' || st === 'DELETED' || st === 'EXPIRED' || st === 'REJECTED') {
+            return false;
+          }
+
+          // Lọc bỏ nếu lệnh có position_id hoặc ticket đã nằm trong danh sách lệnh đã đóng (CLOSED)
+          const ticketStr = String(d.ticket || '').trim();
+          const posStr = String(d.position_id || '').trim();
+          if (ticketStr && closedTicketAndPosSet.has(ticketStr)) return false;
+          if (posStr && closedTicketAndPosSet.has(posStr)) return false;
+
+          return true;
         });
 
         // 1. Xử lý các lệnh CLOSED:
@@ -811,8 +833,8 @@ export default function App() {
         });
         setSupabaseStatus('connected');
         setSelectedTradeId(prev => {
-          if (prev && processed.some(p => p.id === prev)) return prev;
-          return processed[0]?.id || '';
+          if (prev && processed.some(p => String(p.id) === String(prev) || String(p.ticket) === String(prev))) return prev;
+          return processed[0]?.id || processed[0]?.ticket || '';
         });
 
         // 2. Tách biệt các lệnh PENDING_PLAN / OPEN sang Tab Lệnh Chờ
@@ -1617,7 +1639,7 @@ export default function App() {
               trades={trades}
               activeAccount={activeAccount}
               selectedTradeId={selectedTradeId}
-              onSelectTrade={(tr) => setSelectedTradeId(tr.id)}
+              onSelectTrade={(tr) => setSelectedTradeId(tr.id || tr.ticket)}
               timezoneOffset={settings.timezone_offset_hours}
             />
           </div>
