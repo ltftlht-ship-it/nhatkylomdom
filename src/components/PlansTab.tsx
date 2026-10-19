@@ -69,7 +69,7 @@ const COMMON_SYMBOLS = [
 export const PlansTab: React.FC<PlansTabProps> = ({
   plans = [],
   trades = [],
-  accountId = '26325348',
+  accountId = '',
   selectedAccountId,
   preChecklist = [],
   postMistakes = [],
@@ -344,7 +344,7 @@ export const PlansTab: React.FC<PlansTabProps> = ({
         }
       : {
           id: generateValidUUID(),
-          account_id: currentAccountId || '26325348',
+          account_id: currentAccountId || '',
           symbol: symbol.toUpperCase().trim(),
           plan_name: finalName,
           timeframe: tfStr,

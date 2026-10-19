@@ -53,7 +53,7 @@ export const TradeDetailCard: React.FC<TradeDetailCardProps> = ({
   trade,
   allTrades = [],
   plans,
-  accountId = '26325348',
+  accountId = '',
   preChecklistItems,
   postMistakeItems,
   setupTags,

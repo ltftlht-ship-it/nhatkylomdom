@@ -206,7 +206,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
       closedTrades.forEach(t => {
         const net = t.net_pnl !== undefined ? t.net_pnl : (t.pnl || 0);
-        const r = t.weighted_rr || (net / 100);
+        // Lệnh không có SL thì không quy đổi được R, tính 0 thay vì giả định 100$ = 1R
+        const r = t.weighted_rr || 0;
         totalPnl += net;
         totalR += r;
         totalVolume += (t.volume || 0);
@@ -258,7 +259,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
       const avgWin = wins > 0 ? grossProfit / wins : 0;
       const avgLoss = losses > 0 ? grossLoss / losses : 0;
       const expectancy = count > 0 ? ((wins / count) * avgWin) - ((losses / count) * avgLoss) : 0;
-      const avgRR = avgLoss > 0 ? avgWin / avgLoss : 1.5;
+      const avgRR = avgLoss > 0 ? avgWin / avgLoss : 0;
 
       return {
         count,
@@ -302,66 +303,56 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
       };
     }
 
-    // Default Realistic TradeZella / Edgewonk Sample Data
+    // Chưa có lệnh đóng: hiển thị 0, không dùng số liệu mẫu
     return {
-      count: 24,
-      totalTrades: 24,
-      wins: 15,
-      losses: 8,
-      be: 1,
-      winRate: 62.5,
-      grossProfit: 1450.00,
-      grossLoss: 600.00,
-      profitFactor: 2.42,
-      avgWin: 96.67,
-      avgLoss: 75.00,
-      expectancy: 35.42,
-      avgRR: 1.29,
-      avgRiskReward: 1.29,
-      totalVolume: 8.45,
-      totalR: 9.85,
-      netPnl: activeAccount?.pnl ?? 850.00,
-      currentBalance: activeAccount?.balance ?? (initialBalance + 850.00),
-      longTrades: 14,
-      longWins: 9,
-      longWinRate: 64.3,
-      longPnl: 580.00,
-      shortTrades: 10,
-      shortWins: 6,
-      shortWinRate: 60.0,
-      shortPnl: 270.00,
-      setupStats: [
-        { name: 'POI sau IDM', count: 10, winRate: 70.0, pnl: 540.00 },
-        { name: 'Cực Trị', count: 6, winRate: 66.7, pnl: 280.00 },
-        { name: 'Sweep IDM', count: 5, winRate: 60.0, pnl: 160.00 },
-        { name: 'Breaker Block', count: 3, winRate: 33.3, pnl: -130.00 },
-      ],
-      sessionStats: [
-        { name: 'London', count: 12, winRate: 66.7, pnl: 490.00 },
-        { name: 'New York', count: 9, winRate: 55.6, pnl: 310.00 },
-        { name: 'Asian', count: 3, winRate: 66.7, pnl: 50.00 },
-      ]
+      count: 0,
+      totalTrades: 0,
+      wins: 0,
+      losses: 0,
+      be: 0,
+      winRate: 0,
+      grossProfit: 0,
+      grossLoss: 0,
+      profitFactor: 0,
+      avgWin: 0,
+      avgLoss: 0,
+      expectancy: 0,
+      avgRR: 0,
+      avgRiskReward: 0,
+      totalVolume: 0,
+      totalR: 0,
+      netPnl: 0,
+      currentBalance: initialBalance,
+      longTrades: 0,
+      longWins: 0,
+      longWinRate: 0,
+      longPnl: 0,
+      shortTrades: 0,
+      shortWins: 0,
+      shortWinRate: 0,
+      shortPnl: 0,
+      setupStats: [],
+      sessionStats: []
     };
-  }, [closedTrades, initialBalance, activeAccount]);
+  }, [closedTrades, initialBalance]);
 
   const currentBalance = stats.currentBalance;
   const netPnl = stats.netPnl;
   const netPnlPercent = initialBalance > 0 ? (netPnl / initialBalance) * 100 : 0;
-  const peakBalance = Math.max(initialBalance, currentBalance + 180);
-  const maxDrawdown = Math.max(0, peakBalance - currentBalance);
+
+  // Max Drawdown thật: sụt giảm lớn nhất từ đỉnh vốn (theo chuỗi lệnh đã đóng)
+  const maxDrawdown = useMemo(() => {
+    let running = initialBalance;
+    let peak = initialBalance;
+    let maxDd = 0;
+    closedTrades.forEach(tr => {
+      running += tr.net_pnl !== undefined ? tr.net_pnl : (tr.pnl || 0);
+      if (running > peak) peak = running;
+      if (peak - running > maxDd) maxDd = peak - running;
+    });
+    return maxDd;
+  }, [closedTrades, initialBalance]);
   const maxDrawdownPercent = initialBalance > 0 ? (maxDrawdown / initialBalance) * 100 : 0;
-
-  // 3. Edgewonk "Tiltmeter" & Discipline Cost Tracker
-  // How much money did psychological mistakes cost the trader?
-  const disciplineScore = 84; // Out of 100%
-  const mistakeCost = 420.00; // Penalty cost from FOMO, Early exit, revenge
-  const potentialPnl = netPnl + mistakeCost; // PnL without mistakes
-
-  const topMistakes = [
-    { label: 'Early Exit (Cắt non)', count: 3, cost: 210.00, penalty: -15 },
-    { label: 'FOMO (Chasing price)', count: 2, cost: 130.00, penalty: -20 },
-    { label: 'Overleveraged (Overlot)', count: 1, cost: 80.00, penalty: -25 },
-  ];
 
   // 4. Chart Data: Cumulative Curve & R-Multiple
   const cumulativeChartData = useMemo(() => {
@@ -374,7 +365,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
       closedTrades.forEach((tr, idx) => {
         const pnl = tr.net_pnl !== undefined ? tr.net_pnl : (tr.pnl || 0);
-        const r = tr.weighted_rr || (pnl / 100);
+        const r = tr.weighted_rr || 0;
         running += pnl;
         cumR += r;
         const growth = ((running - initialBalance) / initialBalance) * 100;
@@ -392,32 +383,9 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
       return points;
     }
 
-    // Default Curve
-    const demoPnls = [
-      80, -45, 120, -50, 160, 210, -85, 95, 
-      -40, 150, 180, -90, 75, -60, 140, 
-      -35, 195, 230, -110, 85, 145, -70, 180, 120
+    return [
+      { tradeIndex: 0, tradeLabel: 'Start', date: 'Start', balance: initialBalance, pnl: 0, growth: 0, rMultiple: 0 }
     ];
-    let running = initialBalance;
-    let cumR = 0;
-    const points = [
-      { tradeIndex: 0, tradeLabel: 'Start', date: 'Day 1', balance: initialBalance, pnl: 0, growth: 0, rMultiple: 0 }
-    ];
-    demoPnls.forEach((pnl, idx) => {
-      running += pnl;
-      cumR += (pnl / 100);
-      const growth = ((running - initialBalance) / initialBalance) * 100;
-      points.push({
-        tradeIndex: idx + 1,
-        tradeLabel: `Trade #${idx + 1}`,
-        date: `Day ${Math.floor(idx * 1.2) + 1}`,
-        balance: Number(running.toFixed(2)),
-        pnl: pnl,
-        growth: Number(growth.toFixed(2)),
-        rMultiple: Number(cumR.toFixed(2))
-      });
-    });
-    return points;
   }, [closedTrades, initialBalance]);
 
   // 5. Chart Data: TradeZella Daily PnL Bar Chart
@@ -437,69 +405,10 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
       return Object.values(dailyMap);
     }
 
-    // Default Daily Bars (Green & Red days)
-    const demoDaily = [
-      { dateLabel: 'May 02', dailyPnl: 155, tradesCount: 2 },
-      { dateLabel: 'May 03', dailyPnl: -45, tradesCount: 1 },
-      { dateLabel: 'May 04', dailyPnl: 220, tradesCount: 3 },
-      { dateLabel: 'May 05', dailyPnl: 180, tradesCount: 2 },
-      { dateLabel: 'May 08', dailyPnl: -85, tradesCount: 2 },
-      { dateLabel: 'May 09', dailyPnl: 140, tradesCount: 2 },
-      { dateLabel: 'May 10', dailyPnl: 210, tradesCount: 3 },
-      { dateLabel: 'May 11', dailyPnl: -110, tradesCount: 1 },
-      { dateLabel: 'May 12', dailyPnl: 95, tradesCount: 2 },
-      { dateLabel: 'May 15', dailyPnl: -60, tradesCount: 1 },
-      { dateLabel: 'May 16', dailyPnl: 175, tradesCount: 2 },
-      { dateLabel: 'May 17', dailyPnl: 240, tradesCount: 3 },
-      { dateLabel: 'May 18', dailyPnl: -70, tradesCount: 1 },
-      { dateLabel: 'May 19', dailyPnl: 190, tradesCount: 2 },
-    ];
-    return demoDaily;
+    return [];
   }, [closedTrades]);
 
-  // 6. TradeZella Monthly Calendar Heatmap with Weekly Summaries
-  const calendarWeeks = useMemo(() => {
-    // 5 Weeks x 7 days with weekly totals
-    const samplePnls = [
-      // Week 1
-      [120, 85, -40, 210, 0, 0, 0],
-      // Week 2
-      [160, 95, -75, 180, 240, 0, 0],
-      // Week 3
-      [-110, 130, 90, -55, 175, 0, 0],
-      // Week 4
-      [220, 140, -65, 80, 190, 0, 0],
-      // Week 5
-      [-45, 150, 110, 0, 0, 0, 0]
-    ];
 
-    let dayCounter = 1;
-    return samplePnls.map((week, wIdx) => {
-      let weekTotal = 0;
-      let weekTrades = 0;
-      const days = week.map((pnl, dIdx) => {
-        const dayNum = dayCounter++;
-        const isWeekend = dIdx >= 5;
-        const count = isWeekend ? 0 : pnl !== 0 ? (Math.abs(pnl) > 150 ? 3 : Math.abs(pnl) > 80 ? 2 : 1) : 0;
-        if (!isWeekend) {
-          weekTotal += pnl;
-          weekTrades += count;
-        }
-        return {
-          dayNum,
-          pnl,
-          isWeekend,
-          tradesCount: count
-        };
-      });
-      return {
-        weekIndex: wIdx + 1,
-        days,
-        weekTotal,
-        weekTrades
-      };
-    });
-  }, []);
 
   return (
     <div className="flex flex-col min-h-full py-5 px-4 sm:px-6 lg:px-[6%] xl:px-[8%] space-y-6 max-w-[1700px] mx-auto w-full transition-all font-sans select-none">

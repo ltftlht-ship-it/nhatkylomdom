@@ -124,37 +124,6 @@ export const DEFAULT_PLANS: TradingPlan[] = [
   }
 ];
 
-export const DEFAULT_ACCOUNTS: AccountInfo[] = [
-  {
-    id: '26610983',
-    name: 'MT5 #26610983',
-    ticket_server: '26610983 (Exness-Real10)',
-    balance: 100000.00,
-    initial_balance: 100000.00,
-    pnl: 0.00,
-    win_rate: 0,
-    wins: 0,
-    losses: 0,
-    breakeven: 0,
-    connected: true,
-    currency: 'USD',
-  },
-  {
-    id: '26325348',
-    name: 'MT5 #26325348',
-    ticket_server: '26325348 (MT5 Live)',
-    balance: 60000.00,
-    initial_balance: 60000.00,
-    pnl: 0.00,
-    win_rate: 0,
-    wins: 0,
-    losses: 0,
-    breakeven: 0,
-    connected: true,
-    currency: 'USD',
-  },
-];
-
 // Initial raw trades dataset with scaling, FOMO, and Early Exit (Cắt non)
 const RAW_TRADES_DATA: Partial<TradeRow>[] = [
   // Trade 1 (Master row with partial scaling 1.1, 1.2) - Matching Screenshot Row #1

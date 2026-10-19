@@ -168,14 +168,13 @@ export const ImportModal: React.FC<ImportModalProps> = ({
             type="button"
             onClick={() => {
               onResetDemoData();
-              setSuccessMsg('Đã khôi phục dữ liệu demo mẫu hoàn chỉnh!');
+              setSuccessMsg('Đã tải lại lệnh từ Supabase!');
               setTimeout(onClose, 800);
             }}
             className="flex items-center gap-1.5 pb-2 text-[11px] text-amber-400 hover:text-amber-300 font-semibold"
-            title="Khôi phục đầy đủ các lệnh mẫu có gom cụm 1.1, 1.2, FOMO, và Cắt non"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>Nạp Lại Dữ Liệu Mẫu Đầy Đủ</span>
+            <span>Tải Lại Dữ Liệu MT5</span>
           </button>
         </div>
 

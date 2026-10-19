@@ -1301,3 +1301,26 @@ export function formatDateTimeShort(dtStr: string, offsetHours: number = 0): str
   return formatDateTimeWithOffset(dtStr, offsetHours, 'MM-DD HH:mm');
 }
 
+
+/**
+ * Thống kê Thắng / Thua / Hòa theo VỊ THẾ (gộp cắt từng phần thành 1 lệnh).
+ * Cùng công thức với Tab Tổng Quan và Tab Báo Cáo: Thắng khi Net > 0, Thua khi Net < 0,
+ * Winrate = Số lệnh thắng / Tổng số vị thế đã đóng.
+ */
+export function computePositionWinStats(trades: TradeRow[], hideNoise: boolean) {
+  const closed = trades.filter(t => (t.status || 'CLOSED').toUpperCase() === 'CLOSED');
+  const groups = groupTradesByPosition(closed).filter(g => !hideNoise || !(
+    g.is_noise || (g.total_volume != null && Number(g.total_volume) <= 0.01 && Number(g.total_volume) > 0)
+  ));
+  let wins = 0;
+  let losses = 0;
+  let breakeven = 0;
+  groups.forEach(g => {
+    const net = Number(g.net_pnl || 0);
+    if (net > 0) wins++;
+    else if (net < 0) losses++;
+    else breakeven++;
+  });
+  const total = groups.length;
+  return { wins, losses, breakeven, total, winRate: total > 0 ? (wins / total) * 100 : 0 };
+}

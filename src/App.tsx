@@ -13,7 +13,6 @@ import {
 } from './types';
 import { 
   DEFAULT_PLANS, 
-  DEFAULT_ACCOUNTS, 
   DEFAULT_PRE_CHECKLIST, 
   DEFAULT_POST_MISTAKES, 
   DEFAULT_SETUP_TAGS 
@@ -27,6 +26,7 @@ import {
   calculateActualRR,
   getSavedTimezoneOffset,
   computeTradeStatistics,
+  computePositionWinStats,
   getSavedNoiseFilter,
   saveNoiseFilter,
   getSavedHideNoiseRows,
@@ -127,7 +127,7 @@ export default function App() {
   const [selectedResult, setSelectedResult] = useState<string>('ALL');
   const [selectedSetup, setSelectedSetup] = useState<string>('ALL');
   const [noiseFilterActive, setNoiseFilterActive] = useState<boolean>(() => getSavedNoiseFilter());
-  const [hideNoiseRows, setHideNoiseRows] = useState<boolean>(false);
+  const [hideNoiseRows, setHideNoiseRows] = useState<boolean>(() => getSavedHideNoiseRows());
 
   const handleToggleNoiseFilter = () => {
     const next = !noiseFilterActive;
@@ -163,89 +163,32 @@ export default function App() {
     } catch {}
     return [];
   });
+  // Danh sách tài khoản lưu tạm để hiển thị ngay khi mở app; số dư được tính lại từ dữ liệu EA sau khi tải lệnh
   const [accounts, setAccounts] = useState<AccountInfo[]>(() => {
-    const savedUserSession = localStorage.getItem('deal_user_session');
-    if (savedUserSession) {
-      try {
-        const u = JSON.parse(savedUserSession);
-        if (u && !checkIsAdmin(u)) {
-          return [];
-        }
-      } catch {}
-    }
-    const saved = localStorage.getItem('deal_accounts_list');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const cleaned = parsed
-            .filter((a: any) => 
-              a && a.id && 
-              a.id !== 'ALL' && 
-              !String(a.id).startsWith('mock-') && 
-              !String(a.name || '').toLowerCase().includes('tất cả tài khoản')
-            )
-            .map((a: any) => {
-              const cleanId = String(a.id).replace(/^acc-/, '').trim();
-              let initBal = Number(a.initial_balance);
-              if (isNaN(initBal) || initBal === 10000) {
-                if (cleanId === '26325348') initBal = 60000;
-                else if (cleanId === '26610983') initBal = 100000;
-                else initBal = 10000;
-              }
-              const pnl = Number(a.pnl ?? 0);
-              let bal = Number(a.balance);
-              if (isNaN(bal) || bal === 10000 || bal === 0) {
-                bal = Number((initBal + pnl).toFixed(2));
-              }
-              // Bảo vệ chống nhiễm chéo: nếu tài khoản 26325348 bị dính số dư 100k do lỗi cũ, đưa về 60k
-              if (cleanId === '26325348' && (bal > 90000 || initBal > 90000)) {
-                bal = Number((60000 + pnl).toFixed(2));
-                initBal = 60000;
-              }
-              // Bảo vệ chống nhiễm chéo: nếu tài khoản 26610983 bị dính số dư 60k do lỗi cũ, đưa về 100k
-              if (cleanId === '26610983' && (bal < 80000 || initBal < 80000)) {
-                bal = Number((100000 + pnl).toFixed(2));
-                initBal = 100000;
-              }
-              return {
-                ...a,
-                id: cleanId,
-                initial_balance: initBal,
-                balance: bal,
-              };
-            });
-
-          if (cleaned.length > 0) {
-            localStorage.setItem('deal_accounts_list', JSON.stringify(cleaned));
-            return cleaned;
-          }
-        }
-      } catch (e) {
-        console.warn('Failed to parse deal_accounts_list from localStorage', e);
+    try {
+      const parsed = JSON.parse(localStorage.getItem('deal_accounts_list') || '[]');
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((a: any) =>
+            a && a.id &&
+            a.id !== 'ALL' &&
+            !String(a.id).startsWith('mock-') &&
+            !String(a.name || '').toLowerCase().includes('tất cả tài khoản')
+          )
+          .map((a: any) => ({ ...a, id: String(a.id).replace(/^acc-/, '').trim() }));
       }
+    } catch (e) {
+      console.warn('Failed to parse deal_accounts_list from localStorage', e);
     }
-    const def = DEFAULT_ACCOUNTS.filter(a => a && a.id !== 'ALL' && !String(a.id).startsWith('mock-'));
-    localStorage.setItem('deal_accounts_list', JSON.stringify(def));
-    return def;
+    return [];
   });
 
   const accountsRef = useRef<AccountInfo[]>(accounts);
   accountsRef.current = accounts;
 
   const [selectedAccountId, setSelectedAccountId] = useState<string>(() => {
-    const savedUserSession = localStorage.getItem('deal_user_session');
-    if (savedUserSession) {
-      try {
-        const u = JSON.parse(savedUserSession);
-        if (u && !checkIsAdmin(u)) {
-          return '';
-        }
-      } catch {}
-    }
     const saved = localStorage.getItem('deal_selected_account_id');
-    if (saved && saved !== 'ALL') return saved;
-    return '26610983';
+    return saved && saved !== 'ALL' ? saved : '';
   });
 
   const selectedAccountIdRef = useRef<string>(selectedAccountId);
@@ -530,8 +473,10 @@ export default function App() {
 
       const allRaw: any[] = (data as any)?.allRawTrades || data || [];
 
-      // Tự động chuyển sang tài khoản MT5 đang hoạt động nếu người dùng đang ở tài khoản cũ 26325348
-      if (Array.isArray(allRaw) && allRaw.length > 0 && accId === '26325348') {
+      // Admin chưa chọn tài khoản (hoặc tài khoản đã chọn không còn dữ liệu): tự chọn tài khoản MT5 có lệnh mới nhất
+      const detectedIds = new Set((detectedAccounts || []).map(d => String(d.id).replace(/^acc-/, '').trim()));
+      const cleanAccId = String(accId || '').replace(/^acc-/, '').trim();
+      if (isAdmin && Array.isArray(allRaw) && allRaw.length > 0 && (!cleanAccId || !detectedIds.has(cleanAccId))) {
         const sortedNewest = [...allRaw].filter(t => t.close_time || t.open_time).sort((a, b) => {
           const timeA = new Date((a.close_time || a.open_time || '').replace(/[.-]/g, '/')).getTime() || 0;
           const timeB = new Date((b.close_time || b.open_time || '').replace(/[.-]/g, '/')).getTime() || 0;
@@ -542,7 +487,7 @@ export default function App() {
           const newestAcc = String(
             newestTrade.account_id ?? newestTrade.account ?? newestTrade.login ?? ''
           ).replace(/^acc-/, '').trim();
-          if (newestAcc && newestAcc !== '26325348') {
+          if (newestAcc && newestAcc !== cleanAccId) {
             console.log(`[Auto-Switch] Chuyển tự động sang tài khoản MT5 đang chạy lệnh: #${newestAcc}`);
             selectedAccountIdRef.current = newestAcc;
             setSelectedAccountId(newestAcc);
@@ -634,14 +579,8 @@ export default function App() {
           const cleanId = String(a.id).replace(/^acc-/, '').trim();
           const accStats = tradesByAccount.get(cleanId);
           if (accStats) {
-            let effectiveInit = accStats.initialBal;
-            if (!effectiveInit || effectiveInit === 10000) {
-              if (cleanId === '26325348') effectiveInit = 60000;
-              else if (cleanId === '26610983') effectiveInit = 100000;
-              else effectiveInit = a.initial_balance || 10000;
-            }
-            if (cleanId === '26325348' && effectiveInit > 90000) effectiveInit = 60000;
-            if (cleanId === '26610983' && effectiveInit < 80000) effectiveInit = 100000;
+            // Vốn ban đầu lấy từ dữ liệu EA gửi lên (initial_balance), không gán cứng theo số tài khoản
+            const effectiveInit = accStats.initialBal || a.initial_balance || 10000;
 
             const calculatedBal = Number((effectiveInit + accStats.totalNetPnl).toFixed(2));
             if (a.balance !== calculatedBal || a.pnl !== accStats.totalNetPnl || a.initial_balance !== effectiveInit) {
@@ -654,14 +593,7 @@ export default function App() {
               };
             }
           } else {
-            let init = a.initial_balance;
-            if (!init || init === 10000) {
-              if (cleanId === '26325348') init = 60000;
-              else if (cleanId === '26610983') init = 100000;
-              else init = 10000;
-            }
-            if (cleanId === '26325348' && init > 90000) init = 60000;
-            if (cleanId === '26610983' && init < 80000) init = 100000;
+            const init = a.initial_balance || 10000;
             if (a.balance !== init || a.initial_balance !== init) {
               hasChange = true;
               return {
@@ -685,12 +617,7 @@ export default function App() {
             if (!exists) {
               hasChange = true;
               const accStats = tradesByAccount.get(cleanId);
-              let initBal = d.initial_balance || accStats?.initialBal;
-              if (!initBal || initBal === 10000) {
-                if (cleanId === '26325348') initBal = 60000;
-                else if (cleanId === '26610983') initBal = 100000;
-                else initBal = 10000;
-              }
+              const initBal = d.initial_balance || accStats?.initialBal || 10000;
               const bal = accStats ? Number((initBal + accStats.totalNetPnl).toFixed(2)) : initBal;
               const newAcc: AccountInfo = {
                 id: cleanId,
@@ -752,13 +679,9 @@ export default function App() {
 
         const pendingOrOpenRaw = data.filter(d => {
           const st = (d.status || '').toUpperCase().trim();
+          // Chỉ giữ lệnh chờ / đang mở (lệnh đã hủy, xóa, hết hạn bị loại ở đây)
           const isPendingOrOpen = st === 'PENDING_PLAN' || st === 'OPEN' || st === 'PENDING';
           if (!isPendingOrOpen) return false;
-
-          // Bỏ qua nếu lệnh mang trạng thái đã hủy hoặc xóa
-          if (st === 'CANCELED' || st === 'CANCELLED' || st === 'DELETED' || st === 'EXPIRED' || st === 'REJECTED') {
-            return false;
-          }
 
           // Lọc bỏ nếu lệnh có position_id hoặc ticket đã nằm trong danh sách lệnh đã đóng (CLOSED)
           const ticketStr = String(d.ticket || '').trim();
@@ -772,14 +695,7 @@ export default function App() {
         // 1. Xử lý các lệnh CLOSED:
         // Lấy initial_balance của đúng tài khoản đang load (từ accountsRef)
         const targetAcc = accountsRef.current.find(a => a.id === accId) || activeAccount;
-        let initialBalToUse = targetAcc.initial_balance;
-        if (!initialBalToUse || initialBalToUse === 10000) {
-          if (accId === '26325348') initialBalToUse = 60000;
-          else if (accId === '26610983') initialBalToUse = 100000;
-          else initialBalToUse = 10000;
-        }
-        if (accId === '26325348' && initialBalToUse > 90000) initialBalToUse = 60000;
-        if (accId === '26610983' && initialBalToUse < 80000) initialBalToUse = 100000;
+        const initialBalToUse = tradesByAccount.get(cleanAccId)?.initialBal || targetAcc.initial_balance || 10000;
 
         const processed = processSupabaseTrades(
           closedRaw,
@@ -958,6 +874,8 @@ export default function App() {
     }
 
     const stats = computeTradeStatistics(trades, isNoiseFilterActive);
+    // Thắng/Thua/Winrate theo vị thế, cùng công thức với Tab Tổng Quan & Báo Cáo
+    const posStats = computePositionWinStats(trades, hideNoiseRows);
     const totalNetPnl = trades.reduce((sum, t) => sum + (t.net_pnl || 0), 0);
     const latestRunningBalance = trades[0]?.running_balance ?? (currentAccount.initial_balance + totalNetPnl);
 
@@ -965,14 +883,14 @@ export default function App() {
       ...currentAccount,
       balance: Number((latestRunningBalance ?? 0).toFixed(2)),
       pnl: Number((totalNetPnl ?? 0).toFixed(2)),
-      wins: stats?.wins ?? 0,
-      losses: stats?.losses ?? 0,
-      breakeven: stats?.breakeven ?? 0,
-      win_rate: Number((stats?.winRate ?? 0).toFixed(1)),
+      wins: posStats.wins,
+      losses: posStats.losses,
+      breakeven: posStats.breakeven,
+      win_rate: Number(posStats.winRate.toFixed(1)),
       total_rr: stats?.totalRR ?? 0,
       noise_count: stats?.noiseTradesCount ?? 0,
     };
-  }, [trades, activeAccount, accounts, selectedAccountId]);
+  }, [trades, activeAccount, accounts, selectedAccountId, hideNoiseRows]);
 
   // Active selected trade (hỗ trợ cả lệnh khớp và lệnh chờ PENDING)
   const activeTrade = useMemo(() => {

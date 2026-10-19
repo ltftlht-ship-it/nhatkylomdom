@@ -436,7 +436,7 @@ export function extractAccountsFromTrades(trades: any[]): DetectedAccountInfo[] 
  * để tránh lỗi lệch kiểu dữ liệu hoặc lỗi điều kiện lọc.
  */
 export async function fetchTradesFromSupabase(
-  accountId: string = "26610983",
+  accountId: string = "",
   currentUserId?: string,
   isAdminUser: boolean = false
 ): Promise<SupabaseTradeRow[]> {

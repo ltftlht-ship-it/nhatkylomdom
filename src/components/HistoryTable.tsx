@@ -75,7 +75,7 @@ export const HistoryTable: React.FC<HistoryTableProps> = ({
   searchFilter,
   onSearchChange,
   isLoading = false,
-  accountId = '26325348',
+  accountId = '',
   timezoneOffset = 0,
   onSync,
   onOpenSettings,

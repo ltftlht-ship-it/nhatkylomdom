@@ -255,6 +255,7 @@ export const ChartTab: React.FC<ChartTabProps> = ({
   // Khung thời gian cho chế độ cắm cờ MT5
   const [timeframeMinutes, setTimeframeMinutes] = useState<number>(15);
   const [isLoadingCandles, setIsLoadingCandles] = useState<boolean>(false);
+  const [candleNotice, setCandleNotice] = useState<string | null>(null);
 
   // Theme màu nến cho chế độ cắm cờ MT5
   const [candleThemeId, setCandleThemeId] = useState<string>(() => {
@@ -675,17 +676,20 @@ export const ChartTab: React.FC<ChartTabProps> = ({
         ? parseTradeTimeToDisplayUnixSec(relevantTrade.open_time)
         : Math.floor(Date.now() / 1000);
 
-      const realCandles = await fetchRealMarketCandles(
+      const { candles: realCandles, error: candleError } = await fetchRealMarketCandles(
         targetSymbol,
         timeframeMinutes,
-        openSec - 7 * 3600,
-        effectiveOffset
+        openSec - 7 * 3600
       );
 
       if (realCandles.length === 0) {
-        setIsLoadingCandles(false);
+        // Xóa nến/cờ cũ để không hiển thị nhầm nến của lệnh hoặc mã trước đó
+        seriesInstanceRef.current.setData([]);
+        markersPrimitiveRef.current?.setMarkers([]);
+        setCandleNotice(candleError || 'Không có dữ liệu nến');
         return;
       }
+      setCandleNotice(null);
 
       // Đưa nến thị trường về đúng múi giờ hiển thị đồng bộ với lệnh (+4h)
       const candleShiftSec = 7 * 3600;
@@ -708,7 +712,7 @@ export const ChartTab: React.FC<ChartTabProps> = ({
         const volume = relevantTrade.volume || 0.1;
         const entryPrice = Number(relevantTrade.open_price) || 0;
         const exitPrice = Number(relevantTrade.close_price) || 0;
-        const pnl = Number(relevantTrade.pnl) || 0;
+        const pnl = Number(relevantTrade.net_pnl ?? relevantTrade.pnl) || 0;
         const pnlText = pnl >= 0 ? `+${pnl.toFixed(2)}$` : `${pnl.toFixed(2)}$`;
 
         const tradeOpenSec = parseTradeTimeToDisplayUnixSec(relevantTrade.open_time);
@@ -722,16 +726,23 @@ export const ChartTab: React.FC<ChartTabProps> = ({
           }
         }
 
-        markers.push({
-          time: closestEntryCandleTime,
-          position: isBuy ? 'belowBar' : 'aboveBar',
-          color: isBuy ? '#4a6152' : '#825249',
-          shape: isBuy ? 'arrowUp' : 'arrowDown',
-          text: `BUY ${volume}L @ ${entryPrice}`,
-          size: 2,
-        });
+        // Chỉ cắm cờ khi có nến thật trùng thời điểm lệnh (lệch tối đa 2 nến), không cắm vào nến ở mép
+        const maxMarkerGapSec = 2 * Math.max(1, timeframeMinutes) * 60;
+        const entryInRange = minEntryDiff <= maxMarkerGapSec;
+        if (entryInRange) {
+          markers.push({
+            time: closestEntryCandleTime,
+            position: isBuy ? 'belowBar' : 'aboveBar',
+            color: isBuy ? '#4a6152' : '#825249',
+            shape: isBuy ? 'arrowUp' : 'arrowDown',
+            text: `${isBuy ? 'BUY' : 'SELL'} ${volume}L @ ${entryPrice}`,
+            size: 2,
+          });
+        } else {
+          setCandleNotice('Nguồn nến không có dữ liệu tại giờ vào lệnh');
+        }
 
-        if (relevantTrade.close_time && relevantTrade.status !== 'OPEN') {
+        if (entryInRange && relevantTrade.close_time && relevantTrade.status !== 'OPEN') {
           const tradeCloseSec = parseTradeTimeToDisplayUnixSec(relevantTrade.close_time);
           let closestExitCandleTime = formattedData[formattedData.length - 1].time;
           let minExitDiff = Infinity;
@@ -744,7 +755,7 @@ export const ChartTab: React.FC<ChartTabProps> = ({
             }
           }
 
-          markers.push({
+          if (minExitDiff <= maxMarkerGapSec) markers.push({
             time: closestExitCandleTime,
             position: isBuy ? 'aboveBar' : 'belowBar',
             color: pnl >= 0 ? '#4a6152' : '#825249',
@@ -940,6 +951,9 @@ export const ChartTab: React.FC<ChartTabProps> = ({
               <RotateCw className="w-3.5 h-3.5 animate-spin" />
               <span>Đang tải nến...</span>
             </div>
+          )}
+          {!isLoadingCandles && candleNotice && chartMode === 'execution' && (
+            <span className="text-xs text-[#825249] font-mono">{candleNotice}</span>
           )}
         </div>
 

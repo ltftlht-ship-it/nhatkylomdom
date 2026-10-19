@@ -7,16 +7,23 @@ export interface RealCandle {
   volume?: number;
 }
 
-/**
- * Ánh xạ Symbol sang Ticker của Binance hoặc Yahoo Finance
- */
-export function mapSymbolToRealMarketFeed(symbol?: string): {
+export interface MarketFeed {
   type: 'binance' | 'yahoo';
   ticker: string;
-} {
-  const clean = (symbol || 'XAUUSD').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
 
-  // 1. Vàng (Gold)
+const FX_CURRENCIES = ['EUR', 'GBP', 'USD', 'JPY', 'AUD', 'NZD', 'CAD', 'CHF'];
+
+/**
+ * Ánh xạ Symbol sang Ticker của Binance hoặc Yahoo Finance.
+ * Trả về null nếu không có nguồn nến thật cho mã này (không tự gán sang mã khác).
+ */
+export function mapSymbolToRealMarketFeed(symbol?: string): MarketFeed | null {
+  const clean = (symbol || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!clean) return null;
+
+  // 1. Vàng (Gold): Binance không có XAUUSD giao ngay, PAXG là token neo theo giá vàng
+  // nên giá nến có thể lệch vài giá so với báo giá của sàn MT5
   if (clean.includes('XAU') || clean.includes('GOLD')) {
     return { type: 'binance', ticker: 'PAXGUSDT' };
   }
@@ -26,26 +33,22 @@ export function mapSymbolToRealMarketFeed(symbol?: string): {
   if (clean.includes('ETH')) return { type: 'binance', ticker: 'ETHUSDT' };
   if (clean.includes('SOL')) return { type: 'binance', ticker: 'SOLUSDT' };
 
-  // 3. Forex
-  if (clean.includes('EURUSD')) return { type: 'yahoo', ticker: 'EURUSD=X' };
-  if (clean.includes('GBPUSD')) return { type: 'yahoo', ticker: 'GBPUSD=X' };
-  if (clean.includes('USDJPY')) return { type: 'yahoo', ticker: 'JPY=X' };
-  if (clean.includes('AUDUSD')) return { type: 'yahoo', ticker: 'AUDUSD=X' };
-  if (clean.includes('USDCAD')) return { type: 'yahoo', ticker: 'CAD=X' };
-  if (clean.includes('USDCHF')) return { type: 'yahoo', ticker: 'CHF=X' };
-  if (clean.includes('NZDUSD')) return { type: 'yahoo', ticker: 'NZDUSD=X' };
-
-  // 4. Chỉ số Indices
+  // 3. Chỉ số Indices
   if (clean.includes('US30') || clean.includes('DJI')) return { type: 'yahoo', ticker: '^DJI' };
-  if (clean.includes('US100') || clean.includes('NAS')) return { type: 'yahoo', ticker: '^NDX' };
+  if (clean.includes('US100') || clean.includes('NAS') || clean.includes('NDX')) return { type: 'yahoo', ticker: '^NDX' };
   if (clean.includes('US500') || clean.includes('SPX')) return { type: 'yahoo', ticker: '^GSPC' };
 
-  // Mặc định
-  return { type: 'binance', ticker: 'PAXGUSDT' };
+  // 4. Forex: mọi cặp 6 ký tự giữa các đồng tiền chính (EURUSD, GBPJPY, EURGBP...), bỏ hậu tố sàn (.m, pro...)
+  const pair = clean.match(new RegExp(`(${FX_CURRENCIES.join('|')})(${FX_CURRENCIES.join('|')})`));
+  if (pair && pair[1] !== pair[2]) {
+    return { type: 'yahoo', ticker: `${pair[1]}${pair[2]}=X` };
+  }
+
+  return null;
 }
 
 /**
- * Lấy nến thật từ Binance API (Cực kỳ chính xác cho Vàng PAXGUSDT và Crypto)
+ * Lấy nến thật từ Binance API (Vàng PAXGUSDT và Crypto)
  */
 async function fetchBinanceCandles(
   ticker: string,
@@ -85,28 +88,30 @@ async function fetchBinanceCandles(
 }
 
 /**
- * Lấy nến thật từ Yahoo Finance API (Cho các cặp Ngoại hối Forex và Chỉ số)
+ * Lấy nến thật từ Yahoo Finance API (Forex và Chỉ số) theo khoảng thời gian cụ thể.
+ * Giới hạn của Yahoo: nến 1m chỉ có ~30 ngày gần nhất, 5m/15m ~60 ngày, 1h ~2 năm.
  */
 async function fetchYahooCandles(
   ticker: string,
-  intervalStr: string = '15m',
-  rangeStr: string = '5d'
+  intervalStr: string,
+  period1Sec: number,
+  period2Sec: number
 ): Promise<RealCandle[]> {
-  const queryUrl = `/api/yahoo/v8/finance/chart/${encodeURIComponent(ticker)}?interval=${intervalStr}&range=${rangeStr}`;
+  const query = `v8/finance/chart/${encodeURIComponent(ticker)}?interval=${intervalStr}&period1=${period1Sec}&period2=${period2Sec}`;
   let res: Response | null = null;
 
   try {
-    res = await fetch(queryUrl);
+    res = await fetch(`/api/yahoo/${query}`);
   } catch {
     res = null;
   }
 
-  // Fallback qua AllOrigins nếu proxy dev gặp lỗi
+  // Dự phòng qua AllOrigins nếu proxy /api/yahoo gặp lỗi
   if (!res || !res.ok) {
     try {
       res = await fetch(
         `https://api.allorigins.win/raw?url=` +
-          encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=${intervalStr}&range=${rangeStr}`)
+          encodeURIComponent(`https://query1.finance.yahoo.com/${query}`)
       );
     } catch {
       res = null;
@@ -120,7 +125,7 @@ async function fetchYahooCandles(
   const data = await res.json();
   const result = data.chart?.result?.[0];
   if (!result || !result.timestamp || !result.indicators?.quote?.[0]) {
-    throw new Error('Dữ liệu Yahoo rỗng');
+    throw new Error('Yahoo không có dữ liệu nến cho khoảng thời gian này');
   }
 
   const timestamps: number[] = result.timestamp;
@@ -150,69 +155,67 @@ async function fetchYahooCandles(
   return candles;
 }
 
+export interface RealCandleResult {
+  candles: RealCandle[];
+  feed: MarketFeed | null;
+  error?: string;
+}
+
+const CANDLES_TOTAL = 500;
+const CANDLES_BEFORE = 200;
+
 /**
- * Hàm lấy nến thật tổng hợp cho bất kỳ cặp tiền nào:
- * Đảm bảo 100% nến thật từ thị trường, không suy luận.
+ * Lấy nến thật cho mã giao dịch, khoảng 200 nến trước và 300 nến sau thời điểm lệnh.
+ * Đảm bảo 100% nến thật đúng mã: lỗi hoặc không có nguồn thì trả về rỗng kèm lý do,
+ * không thay bằng nến của mã khác.
  */
 export async function fetchRealMarketCandles(
   symbol: string,
   timeframeMinutes: number = 15,
-  targetTimeSec?: number,
-  timezoneOffsetHours: number = 7
-): Promise<RealCandle[]> {
+  targetTimeSec?: number
+): Promise<RealCandleResult> {
   const feed = mapSymbolToRealMarketFeed(symbol);
+  if (!feed) {
+    return { candles: [], feed: null, error: `Chưa có nguồn nến thật cho mã ${symbol}` };
+  }
 
   // Quy đổi khung thời gian
   let binanceTf = '15m';
   let yahooTf = '15m';
+  let tfSec = 15 * 60;
 
   if (timeframeMinutes <= 1) {
-    binanceTf = '1m';
-    yahooTf = '1m';
+    binanceTf = '1m'; yahooTf = '1m'; tfSec = 60;
   } else if (timeframeMinutes <= 5) {
-    binanceTf = '5m';
-    yahooTf = '5m';
+    binanceTf = '5m'; yahooTf = '5m'; tfSec = 5 * 60;
   } else if (timeframeMinutes <= 15) {
-    binanceTf = '15m';
-    yahooTf = '15m';
+    binanceTf = '15m'; yahooTf = '15m'; tfSec = 15 * 60;
   } else if (timeframeMinutes <= 60) {
-    binanceTf = '1h';
-    yahooTf = '60m';
+    binanceTf = '1h'; yahooTf = '60m'; tfSec = 3600;
   } else if (timeframeMinutes <= 240) {
-    binanceTf = '4h';
-    yahooTf = '60m';
+    // Yahoo không có nến 4h: Forex/Chỉ số dùng nến 1h
+    binanceTf = '4h'; yahooTf = '60m'; tfSec = 4 * 3600;
   } else {
-    binanceTf = '1d';
-    yahooTf = '1d';
+    binanceTf = '1d'; yahooTf = '1d'; tfSec = 86400;
   }
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  const target = targetTimeSec && targetTimeSec > 0 ? targetTimeSec : nowSec;
+  const yahooTfSec = yahooTf === '60m' ? 3600 : tfSec;
 
   let candles: RealCandle[] = [];
-
-  // Tính startTimeMs nếu có mốc targetTimeSec của lệnh
-  let startTimeMs: number | undefined;
-  if (targetTimeSec && targetTimeSec > 0) {
-    // Lấy trước thời điểm lệnh 2 ngày để đủ nến bối cảnh
-    startTimeMs = (targetTimeSec - 2 * 24 * 3600) * 1000;
-  }
-
   try {
     if (feed.type === 'binance') {
-      candles = await fetchBinanceCandles(feed.ticker, binanceTf, 500, startTimeMs);
+      const startSec = target - CANDLES_BEFORE * tfSec;
+      candles = await fetchBinanceCandles(feed.ticker, binanceTf, CANDLES_TOTAL, startSec * 1000);
     } else {
-      candles = await fetchYahooCandles(feed.ticker, yahooTf, '5d');
+      const period1 = target - CANDLES_BEFORE * yahooTfSec;
+      const period2 = Math.min(nowSec, target + (CANDLES_TOTAL - CANDLES_BEFORE) * yahooTfSec);
+      candles = await fetchYahooCandles(feed.ticker, yahooTf, period1, period2);
     }
-  } catch (err) {
-    console.warn(`Lỗi nguồn nến ${feed.type}:`, err);
-    // Fallback sang nguồn phụ
-    try {
-      if (feed.type === 'binance') {
-        candles = await fetchYahooCandles('GC=F', yahooTf, '5d');
-      } else {
-        candles = await fetchBinanceCandles('PAXGUSDT', binanceTf, 500);
-      }
-    } catch (err2) {
-      console.warn('Lỗi cả 2 nguồn nến:', err2);
-    }
+  } catch (err: any) {
+    console.warn(`Lỗi nguồn nến ${feed.type} ${feed.ticker}:`, err);
+    return { candles: [], feed, error: err?.message || 'Không tải được nến' };
   }
 
   // Sắp xếp tăng dần theo thời gian và lọc bỏ trùng
@@ -227,5 +230,8 @@ export async function fetchRealMarketCandles(
     }
   }
 
-  return uniqueCandles;
+  if (uniqueCandles.length === 0) {
+    return { candles: [], feed, error: 'Nguồn nến không có dữ liệu cho thời điểm lệnh' };
+  }
+  return { candles: uniqueCandles, feed };
 }

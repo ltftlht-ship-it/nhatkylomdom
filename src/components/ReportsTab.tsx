@@ -234,7 +234,8 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
   }, []);
 
   const [viewMode] = useState<'positions' | 'deals'>('positions');
-  const [hideNoise] = useState<boolean>(hideNoiseRows);
+  // Đọc trực tiếp prop để bật/tắt Ẩn lệnh rác cập nhật ngay, đồng bộ với Tab Tổng Quan
+  const hideNoise = hideNoiseRows;
 
   // Interactive switchers for visual cards
   const [pnlTimeframe, setPnlTimeframe] = useState<'day' | 'week' | 'month'>('day');

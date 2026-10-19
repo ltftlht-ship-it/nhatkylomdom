@@ -273,7 +273,7 @@ export const Header: React.FC<HeaderProps> = ({
                     type="text"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    placeholder="Ví dụ: MT5 #26325348"
+                    placeholder="Ví dụ: MT5 #12345678"
                     className="w-full px-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-main)] rounded-lg text-xs text-[var(--text-primary)] font-semibold focus:outline-none focus:border-teal-500"
                   />
                 </div>
