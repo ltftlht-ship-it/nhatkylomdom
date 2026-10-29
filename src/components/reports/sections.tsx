@@ -27,10 +27,10 @@ export function PsychologySection({ psy, psyPrev, all, settings, onSettings, pla
   return (
     <Card id="tam-ly" title="Điểm Tâm Lý" right={
       <button type="button" onClick={() => setShowSettings(v => !v)}
-        className="px-3 py-1 rounded-full text-xs font-bold bg-[var(--bg-subtle)] clay-well text-[var(--text-secondary)] hover:text-[#4a6152] cursor-pointer">Ngưỡng</button>
+        className="px-3 py-1 rounded-full text-xs font-bold bg-[var(--bg-card-hover)] border border-[var(--border-main)] text-[var(--text-secondary)] hover:text-[#2e6b4a] cursor-pointer">Ngưỡng</button>
     }>
       {showSettings && (
-        <div className="flex flex-wrap gap-4 mb-4 p-3 rounded-2xl bg-[var(--bg-subtle)] clay-well">
+        <div className="flex flex-wrap gap-4 mb-4 p-3 rounded-2xl bg-[var(--bg-card-hover)] border border-[var(--border-main)]">
           <NumInput label="Trả thù trong (phút)" value={settings.revengeMinutes} onChange={v => set({ revengeMinutes: v ?? 0 })} />
           <NumInput label="Tối đa lệnh/ngày" value={settings.maxTradesPerDay} onChange={v => set({ maxTradesPerDay: v ?? 0 })} />
           <NumInput label="Hụt ăn ≥ (R)" value={settings.greedGapR} step={0.1} onChange={v => set({ greedGapR: v ?? 0 })} />
@@ -41,19 +41,19 @@ export function PsychologySection({ psy, psyPrev, all, settings, onSettings, pla
       )}
 
       <div className="flex flex-col lg:flex-row gap-4">
-        <div className="flex flex-col items-center justify-center rounded-2xl p-5 bg-[var(--bg-subtle)] clay-well min-w-[170px]">
-          <div className={`text-5xl font-black font-mono ${scoreClass(psy.score)}`}>{psy.score ?? '—'}</div>
+        <div className="flex flex-col items-center justify-center rounded-2xl p-5 bg-[var(--bg-card-hover)] border border-[var(--border-main)] min-w-[170px]">
+          <div className={`text-5xl font-black tabular-nums ${scoreClass(psy.score)}`}>{psy.score ?? '—'}</div>
           <div className={`text-sm font-black mt-1 ${scoreClass(psy.score)}`}>{psy.level}</div>
-          {psyPrev && <div className="text-[11px] font-mono mt-1"><Delta cur={psy.score} prev={psyPrev.score} fmt={v => `${v} điểm`} /></div>}
+          {psyPrev && <div className="text-[11px] tabular-nums mt-1"><Delta cur={psy.score} prev={psyPrev.score} fmt={v => `${v} điểm`} /></div>}
         </div>
         <div className="flex-1 min-w-0">
-          <div className={`text-[11px] font-bold uppercase tracking-wider mb-2 ${MUTED}`}>8 tuần gần nhất</div>
+          <div className={`text-[12px] font-semibold mb-2 ${MUTED}`}>8 tuần gần nhất</div>
           <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
             {weekly.map(w => (
-              <div key={w.label} className="rounded-xl p-2 bg-[var(--bg-subtle)] text-center">
-                <div className={`text-[10px] font-mono ${MUTED}`}>{w.label}</div>
-                <div className={`text-base font-black font-mono ${scoreClass(w.score)}`}>{w.score ?? '—'}</div>
-                <div className={`text-[10px] font-mono ${MUTED}`}>{w.count} lệnh</div>
+              <div key={w.label} className="rounded-xl p-2 bg-[var(--bg-card-hover)] border border-[var(--border-main)] text-center">
+                <div className={`text-[11px] tabular-nums ${MUTED}`}>{w.label}</div>
+                <div className={`text-base font-black tabular-nums ${scoreClass(w.score)}`}>{w.score ?? '—'}</div>
+                <div className={`text-[11px] tabular-nums ${MUTED}`}>{w.count} lệnh</div>
               </div>
             ))}
           </div>
@@ -65,19 +65,19 @@ export function PsychologySection({ psy, psyPrev, all, settings, onSettings, pla
           const prev = psyPrev?.metrics.find(p => p.id === m.id);
           return (
             <button key={m.id} type="button" onClick={() => setOpen(open === m.id ? null : m.id)}
-              className={`text-left rounded-2xl p-3 bg-[var(--bg-subtle)] clay-well cursor-pointer hover:text-[#4a6152] ${open === m.id ? 'ring-2 ring-[#4a6152]' : ''}`}>
+              className={`text-left rounded-2xl p-3 bg-[var(--bg-card-hover)] border border-[var(--border-main)] cursor-pointer hover:text-[#2e6b4a] ${open === m.id ? 'ring-2 ring-[#2e6b4a]' : ''}`}>
               <div className="flex items-center justify-between gap-2">
-                <span className={`text-[11px] font-bold uppercase tracking-wider ${MUTED} truncate`}>{m.name}</span>
-                <span className={`text-sm font-black font-mono ${m.excluded ? MUTED : scoreClass(m.score)}`}>{m.score ?? '—'}</span>
+                <span className={`text-[12px] font-semibold ${MUTED} truncate`}>{m.name}</span>
+                <span className={`text-sm font-black tabular-nums ${m.excluded ? MUTED : scoreClass(m.score)}`}>{m.score ?? '—'}</span>
               </div>
-              <div className="text-lg font-black font-mono text-[var(--text-primary)] mt-1">
+              <div className="text-lg font-black tabular-nums text-[var(--text-primary)] mt-1">
                 {m.value === null ? '—' : m.unit === '%' ? `${m.value.toFixed(1)}%` : `${m.value.toFixed(2)}x`}
               </div>
-              <div className={`text-[10px] font-mono ${MUTED}`}>
+              <div className={`text-[11px] tabular-nums ${MUTED}`}>
                 {m.score === null && m.note ? m.note : `${m.offenders.length} vi phạm · ${m.sample} ${m.sampleUnit}`}
               </div>
-              {m.excluded && <div className={`text-[10px] font-mono ${WARN}`}>Mẫu nhỏ</div>}
-              {psyPrev && !m.excluded && <div className="text-[10px] font-mono"><Delta cur={m.score} prev={prev && !prev.excluded ? prev.score : null} fmt={v => `${v}`} /></div>}
+              {m.excluded && <div className={`text-[11px] tabular-nums ${WARN}`}>Mẫu nhỏ</div>}
+              {psyPrev && !m.excluded && <div className="text-[11px] tabular-nums"><Delta cur={m.score} prev={prev && !prev.excluded ? prev.score : null} fmt={v => `${v}`} /></div>}
             </button>
           );
         })}
@@ -87,7 +87,7 @@ export function PsychologySection({ psy, psyPrev, all, settings, onSettings, pla
         <div className="mt-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <span className="text-xs font-black text-[var(--text-primary)]">{opened.name}</span>
-            {opened.note && <span className={`text-[11px] font-mono ${MUTED}`}>{opened.note}</span>}
+            {opened.note && <span className={`text-[11px] tabular-nums ${MUTED}`}>{opened.note}</span>}
           </div>
           <PositionList list={opened.offenders} onSelect={onSelect} />
         </div>
@@ -119,7 +119,7 @@ export function PlanSection({ list, checklistSize }: { list: Position[]; checkli
       <GroupTable rows={rows} keyLabel="" />
       {mistakeRows.length > 0 && (
         <div className="mt-4">
-          <div className={`text-[11px] font-bold uppercase tracking-wider mb-2 ${MUTED}`}>Theo lỗi Thầy ghi</div>
+          <div className={`text-[12px] font-semibold mb-2 ${MUTED}`}>Theo lỗi Thầy ghi</div>
           <GroupTable rows={mistakeRows} keyLabel="Lỗi" />
         </div>
       )}
@@ -162,7 +162,7 @@ export function PropSection({ all, initialBalance, accountId }: { all: Position[
 
   return (
     <Card id="luat-quy" title="Luật Quỹ · Toàn tài khoản">
-      <div className="flex flex-wrap gap-4 mb-4 p-3 rounded-2xl bg-[var(--bg-subtle)] clay-well">
+      <div className="flex flex-wrap gap-4 mb-4 p-3 rounded-2xl bg-[var(--bg-card-hover)] border border-[var(--border-main)]">
         <NumInput label="Lỗ ngày tối đa (%)" value={rules.dailyLossPct} step={0.5} onChange={v => update({ dailyLossPct: v })} />
         <NumInput label="Lỗ tối đa (%)" value={rules.maxDdPct} step={0.5} onChange={v => update({ maxDdPct: v })} />
         <NumInput label="Mục tiêu (%)" value={rules.targetPct} step={0.5} onChange={v => update({ targetPct: v })} />
@@ -170,7 +170,7 @@ export function PropSection({ all, initialBalance, accountId }: { all: Position[
         <NumInput label="Ngày lãi lớn nhất ≤ (%)" value={rules.consistencyPct} onChange={v => update({ consistencyPct: v })} />
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full text-xs font-mono">
+        <table className="w-full text-[13px] tabular-nums">
           <tbody>
             {rows.map(r => (
               <tr key={r.label} className="border-b border-[var(--border-main)] last:border-0">
@@ -225,9 +225,9 @@ export function PerformanceSection({ list, onSelect }: { list: Position[]; onSel
         </button>
       </div>
 
-      <div className={`text-[11px] font-bold uppercase tracking-wider mt-5 mb-2 ${MUTED}`}>Giờ vào lệnh × Thứ</div>
+      <div className={`text-[12px] font-semibold mt-5 mb-2 ${MUTED}`}>Giờ vào lệnh × Thứ</div>
       <div className="overflow-x-auto">
-        <table className="text-[9px] font-mono border-separate border-spacing-0.5">
+        <table className="text-[9px] tabular-nums border-separate border-spacing-0.5">
           <thead>
             <tr><th></th>{Array.from({ length: 24 }, (_, h) => <th key={h} className={`${MUTED} font-normal w-6`}>{h}</th>)}</tr>
           </thead>
@@ -240,7 +240,7 @@ export function PerformanceSection({ list, onSelect }: { list: Position[]; onSel
                   return (
                     <td key={h} title={c.count ? `${WEEKDAYS[d]} ${h}h: ${c.count} lệnh, ${fmtMoney(c.net)}, thắng ${c.wins}` : ''}
                       className="w-6 h-6 rounded text-center align-middle text-[var(--text-primary)]"
-                      style={{ background: c.count ? (c.net >= 0 ? `rgba(74,97,82,${a})` : `rgba(130,82,73,${a})`) : 'var(--bg-subtle)' }}>
+                      style={{ background: c.count ? (c.net >= 0 ? `rgba(46,107,74,${a})` : `rgba(163,64,47,${a})`) : 'var(--bg-subtle)' }}>
                       {c.count || ''}
                     </td>
                   );
@@ -261,7 +261,7 @@ export function MfeMaeSection({ list }: { list: Position[] }) {
   const pct = (v: number | null) => (v === null ? '—' : `${v.toFixed(0)}%`);
   const r = (v: number | null) => (v === null ? '—' : `${v.toFixed(2)}R`);
   return (
-    <Card id="mfe-mae" title="MFE & MAE" right={<span className={`text-[11px] font-mono ${MUTED}`}>Đo trên {m.sample}/{m.total} lệnh có dữ liệu đỉnh/đáy từ EA</span>}>
+    <Card id="mfe-mae" title="MFE & MAE" right={<span className={`text-[11px] tabular-nums ${MUTED}`}>Đo trên {m.sample}/{m.total} lệnh có dữ liệu đỉnh/đáy từ EA</span>}>
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
         <Stat label="Đỉnh MFE TB · lệnh thắng" value={r(m.avgMfeWinners)} />
         <Stat label="Giữ được TB · lệnh thắng" value={pct(m.avgCaptureWinners)} />
@@ -271,9 +271,9 @@ export function MfeMaeSection({ list }: { list: Position[] }) {
         <Stat label="Đáy MAE TB · lệnh thắng" value={r(m.avgMaeWinners)} sub={<span className={MUTED}>{m.maeSample} lệnh</span>} />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-        {[['Đỉnh MFE chạy được', m.mfeBuckets, '#4a6152'], ['Đáy MAE phải gồng (lệnh thắng)', m.maeWinnerBuckets, '#825249']].map(([title, data, color]: any) => (
+        {[['Đỉnh MFE chạy được', m.mfeBuckets, '#2e6b4a'], ['Đáy MAE phải gồng (lệnh thắng)', m.maeWinnerBuckets, '#a3402f']].map(([title, data, color]: any) => (
           <div key={title}>
-            <div className={`text-[11px] font-bold uppercase tracking-wider mb-1 ${MUTED}`}>{title}</div>
+            <div className={`text-[12px] font-semibold mb-1 ${MUTED}`}>{title}</div>
             <div className="h-40">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
@@ -310,9 +310,9 @@ export function PartialSection({ list }: { list: Position[] }) {
       <GroupTable rows={rows} keyLabel="" />
       {p.byLeg.length > 0 && (
         <div className="mt-4 overflow-x-auto">
-          <div className={`text-[11px] font-bold uppercase tracking-wider mb-2 ${MUTED}`}>Theo từng lần cắt</div>
-          <table className="w-full text-xs font-mono whitespace-nowrap">
-            <thead><tr className={`${MUTED} text-[10px] uppercase`}><th className="px-2 py-1 text-left"></th><th className="px-2 py-1 text-right">Lệnh</th><th className="px-2 py-1 text-right">Lần cắt lãi</th><th className="px-2 py-1 text-right">R TB</th><th className="px-2 py-1 text-right">PnL</th></tr></thead>
+          <div className={`text-[12px] font-semibold mb-2 ${MUTED}`}>Theo từng lần cắt</div>
+          <table className="w-full text-[13px] tabular-nums whitespace-nowrap">
+            <thead><tr className={`${MUTED} text-[11px] uppercase`}><th className="px-2 py-1 text-left"></th><th className="px-2 py-1 text-right">Lệnh</th><th className="px-2 py-1 text-right">Lần cắt lãi</th><th className="px-2 py-1 text-right">R TB</th><th className="px-2 py-1 text-right">PnL</th></tr></thead>
             <tbody>
               {p.byLeg.map(l => (
                 <tr key={l.index} className="border-t border-[var(--border-main)]">
@@ -351,8 +351,8 @@ export function WhatIfSection({ list, psy, plansCount }: { list: Position[]; psy
   return (
     <Card id="gia-lap" title="Giả lập What-If" right={<NumInput label="Chốt cố định (R)" value={targetR} step={0.5} onChange={setTargetR} />}>
       <div className="overflow-x-auto">
-        <table className="w-full text-xs font-mono whitespace-nowrap">
-          <thead><tr className={`${MUTED} text-[10px] uppercase`}><th className="px-2 py-1 text-left">Kịch bản</th><th className="px-2 py-1 text-right">Thực tế</th><th className="px-2 py-1 text-right">Giả lập</th><th className="px-2 py-1 text-right">Chênh lệch</th><th className="px-2 py-1 text-right">Lệnh thay đổi</th></tr></thead>
+        <table className="w-full text-[13px] tabular-nums whitespace-nowrap">
+          <thead><tr className={`${MUTED} text-[11px] uppercase`}><th className="px-2 py-1 text-left">Kịch bản</th><th className="px-2 py-1 text-right">Thực tế</th><th className="px-2 py-1 text-right">Giả lập</th><th className="px-2 py-1 text-right">Chênh lệch</th><th className="px-2 py-1 text-right">Lệnh thay đổi</th></tr></thead>
           <tbody>
             {results.map(r => (
               <tr key={r.id} className="border-t border-[var(--border-main)]">
@@ -374,7 +374,7 @@ export function WhatIfSection({ list, psy, plansCount }: { list: Position[]; psy
             <Tooltip formatter={(v: any) => [fmtMoney(Number(v)), 'Chênh lệch']} />
             <ReferenceLine x={0} stroke="var(--border-main)" />
             <Bar dataKey="delta" radius={[0, 4, 4, 0]}>
-              {chart.map(c => <Cell key={c.name} fill={c.delta >= 0 ? '#4a6152' : '#825249'} />)}
+              {chart.map(c => <Cell key={c.name} fill={c.delta >= 0 ? '#2e6b4a' : '#a3402f'} />)}
             </Bar>
           </BarChart>
         </ResponsiveContainer>

@@ -2,19 +2,19 @@ import React from 'react';
 import { Position } from '../../utils/reportPositions';
 import { fmtMoney, fmtR } from '../../utils/reportStats';
 
-export const WIN = 'text-[#4a6152]';
-export const LOSS = 'text-[#825249]';
-export const MUTED = 'text-[#737973]';
-export const WARN = 'text-amber-600';
+export const WIN = 'text-[#2e6b4a]';
+export const LOSS = 'text-[#a3402f]';
+export const MUTED = 'text-[#5a605a]';
+export const WARN = 'text-[#b06d0a]';
 
 export const pnlClass = (v: number | null | undefined) => (v === null || v === undefined ? MUTED : v > 0 ? WIN : v < 0 ? LOSS : MUTED);
 export const scoreClass = (s: number | null) =>
-  s === null ? MUTED : s >= 80 ? WIN : s >= 60 ? WARN : s >= 40 ? 'text-orange-600' : LOSS;
+  s === null ? MUTED : s >= 80 ? WIN : s >= 60 ? WARN : s >= 40 ? 'text-[#c2571a]' : LOSS;
 
 export const Card: React.FC<{ id?: string; title: string; right?: React.ReactNode; children: React.ReactNode }> = ({ id, title, right, children }) => (
   <section id={id} className="bg-[var(--bg-card)] rounded-3xl p-4 sm:p-5 clay-card border border-[var(--border-main)] scroll-mt-24">
     <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-      <h3 className="font-black text-[var(--text-primary)] text-xs tracking-wider uppercase">{title}</h3>
+      <h3 className="font-extrabold text-[var(--text-primary)] text-[15px]">{title}</h3>
       {right}
     </div>
     {children}
@@ -22,10 +22,10 @@ export const Card: React.FC<{ id?: string; title: string; right?: React.ReactNod
 );
 
 export const Stat: React.FC<{ label: string; value: React.ReactNode; cls?: string; sub?: React.ReactNode }> = ({ label, value, cls, sub }) => (
-  <div className="rounded-2xl p-3 bg-[var(--bg-subtle)] clay-well min-w-0">
-    <div className={`text-[11px] font-bold uppercase tracking-wider ${MUTED} truncate`}>{label}</div>
-    <div className={`text-lg font-black font-mono mt-1 truncate ${cls || 'text-[var(--text-primary)]'}`}>{value}</div>
-    {sub !== undefined && <div className="text-[10px] font-mono mt-0.5">{sub}</div>}
+  <div className="rounded-2xl p-3 bg-[var(--bg-card-hover)] border border-[var(--border-main)] min-w-0">
+    <div className={`text-[12px] font-semibold ${MUTED} truncate`}>{label}</div>
+    <div className={`text-[22px] leading-tight font-extrabold tabular-nums mt-1 truncate ${cls || 'text-[var(--text-primary)]'}`}>{value}</div>
+    {sub !== undefined && <div className="text-[12px] font-semibold tabular-nums mt-0.5">{sub}</div>}
   </div>
 );
 
@@ -44,16 +44,16 @@ export const NumInput: React.FC<{ label: string; value: number | null; onChange:
     {label}
     <input type="number" step={step} value={value ?? ''}
       onChange={e => onChange(e.target.value === '' ? null : Number(e.target.value))}
-      className="w-16 px-2 py-1 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-main)] text-[var(--text-primary)] font-mono text-xs focus:outline-none focus:border-[#4a6152]" />
+      className="w-16 px-2 py-1 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-main)] text-[var(--text-primary)] tabular-nums text-xs focus:outline-none focus:border-[#2e6b4a]" />
   </label>
 );
 
 export const Pills: React.FC<{ options: [string, string][]; value: string; onChange: (v: string) => void }> = ({ options, value, onChange }) => (
-  <div className="flex items-center gap-1 p-1 rounded-full bg-[var(--bg-subtle)] clay-well flex-wrap">
+  <div className="flex items-center gap-1 p-1 rounded-full bg-[var(--bg-card-hover)] border border-[var(--border-main)] flex-wrap">
     {options.map(([k, label]) => (
       <button key={k} type="button" onClick={() => onChange(k)}
         className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
-          value === k ? 'bg-[var(--bg-card)] text-[#1d1b17] clay-pill font-black shadow-sm' : 'text-[var(--text-secondary)] hover:text-[#4a6152]'
+          value === k ? 'bg-[var(--bg-card)] text-[#1d1b17] clay-pill font-black shadow-sm' : 'text-[var(--text-secondary)] hover:text-[#2e6b4a]'
         }`}>
         {label}
       </button>
@@ -67,11 +67,11 @@ export function PositionList({ list, onSelect, max = 300 }: { list: Position[]; 
   if (!list.length) return <div className={`text-xs ${MUTED} py-2`}>Không có lệnh nào</div>;
   return (
     <div className="mt-3 max-h-64 overflow-auto rounded-xl border border-[var(--border-main)]">
-      <table className="w-full text-xs font-mono whitespace-nowrap">
+      <table className="w-full text-[13px] tabular-nums whitespace-nowrap">
         <tbody>
           {list.slice(0, max).map(p => (
             <tr key={p.id} onClick={() => onSelect?.(p)}
-              className="border-b border-[var(--border-main)] last:border-0 hover:text-[#4a6152] cursor-pointer">
+              className="border-b border-[var(--border-main)] last:border-0 hover:text-[#2e6b4a] cursor-pointer">
               <td className="px-3 py-1.5">#{p.ticket}{p.isScaled ? ` (${p.legs.length} lần cắt)` : ''}</td>
               <td className="px-3 py-1.5">{dt(p.openTime)}</td>
               <td className="px-3 py-1.5">{p.symbol} {p.isBuy ? 'BUY' : 'SELL'}</td>
@@ -92,9 +92,9 @@ export function GroupTable({ rows, keyLabel }: { rows: { key: string; label: str
   const maxAbs = Math.max(1, ...rows.map(r => Math.abs(r.net)));
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-xs font-mono whitespace-nowrap">
+      <table className="w-full text-[13px] tabular-nums whitespace-nowrap">
         <thead>
-          <tr className={`${MUTED} text-[10px] uppercase`}>
+          <tr className={`${MUTED} text-[11px] uppercase`}>
             <th className="px-2 py-1 text-left">{keyLabel}</th>
             <th className="px-2 py-1 text-right">Lệnh</th>
             <th className="px-2 py-1 text-right">Win</th>
@@ -115,7 +115,7 @@ export function GroupTable({ rows, keyLabel }: { rows: { key: string; label: str
               <td className={`px-2 py-1.5 text-right font-bold ${pnlClass(r.net)}`}>{fmtMoney(r.net)}</td>
               <td className="px-2 py-1.5">
                 <div className="h-1.5 rounded-full bg-[var(--bg-subtle)] overflow-hidden">
-                  <div className={`h-full ${r.net >= 0 ? 'bg-[#4a6152]' : 'bg-[#825249]'}`} style={{ width: `${(Math.abs(r.net) / maxAbs) * 100}%` }} />
+                  <div className={`h-full ${r.net >= 0 ? 'bg-[#2e6b4a]' : 'bg-[#a3402f]'}`} style={{ width: `${(Math.abs(r.net) / maxAbs) * 100}%` }} />
                 </div>
               </td>
             </tr>

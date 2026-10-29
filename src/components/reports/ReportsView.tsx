@@ -105,7 +105,7 @@ export const ReportsView: React.FC<Props> = ({
     { label: 'R TB / lệnh', cur: cur.avgR, prev: prev?.avgR ?? null, show: v => fmtR(v), cls: pnlClass(cur.avgR), fmt: v => `${v.toFixed(2)}R` },
     { label: 'Tổng R', cur: cur.rCount ? cur.totalR : null, prev: prev?.rCount ? prev.totalR : null, show: v => fmtR(v), cls: pnlClass(cur.totalR), fmt: v => `${v.toFixed(2)}R` },
     { label: 'Lãi TB / Lỗ TB', cur: cur.payoff, prev: prev?.payoff ?? null, show: v => v.toFixed(2), fmt: v => v.toFixed(2) },
-    { label: 'Sụt giảm lớn nhất', cur: list.length ? eq.maxDrawdown : null, prev: null, show: v => `-$${v.toFixed(2)}`, cls: 'text-[#825249]', fmt: v => `$${v.toFixed(2)}` },
+    { label: 'Sụt giảm lớn nhất', cur: list.length ? eq.maxDrawdown : null, prev: null, show: v => `-$${v.toFixed(2)}`, cls: 'text-[#a3402f]', fmt: v => `$${v.toFixed(2)}` },
     { label: 'Chuỗi thắng / thua', cur: null, prev: null, show: () => '', fmt: () => '' },
     { label: 'Phí + Swap', cur: list.length ? cur.fees : null, prev: prev ? prev.fees : null, show: fmtMoney, cls: pnlClass(cur.fees), fmt: v => `$${v.toFixed(2)}` },
     { label: 'Điểm Tâm Lý', cur: psy.score, prev: psyPrev?.score ?? null, show: v => String(v), cls: scoreClass(psy.score), fmt: v => `${v}` },
@@ -120,28 +120,28 @@ export const ReportsView: React.FC<Props> = ({
           <Pills value={kind} onChange={changeKind} options={[['WEEK', 'Tuần'], ['MONTH', 'Tháng'], ['QUARTER', 'Quý'], ['ALL', 'Tất cả'], ['CUSTOM', 'Tùy chọn']]} />
           {(kind === 'WEEK' || kind === 'MONTH' || kind === 'QUARTER') && (
             <div className="flex items-center gap-1">
-              <button type="button" onClick={() => setStep(s => s - 1)} className="w-7 h-7 rounded-full bg-[var(--bg-subtle)] clay-well font-black hover:text-[#4a6152] cursor-pointer">‹</button>
+              <button type="button" onClick={() => setStep(s => s - 1)} className="w-7 h-7 rounded-full bg-[var(--bg-card-hover)] border border-[var(--border-main)] font-black hover:text-[#2e6b4a] cursor-pointer">‹</button>
               <button type="button" onClick={() => setStep(s => Math.min(0, s + 1))} disabled={step >= 0}
-                className="w-7 h-7 rounded-full bg-[var(--bg-subtle)] clay-well font-black hover:text-[#4a6152] cursor-pointer disabled:opacity-40 disabled:cursor-default">›</button>
+                className="w-7 h-7 rounded-full bg-[var(--bg-card-hover)] border border-[var(--border-main)] font-black hover:text-[#2e6b4a] cursor-pointer disabled:opacity-40 disabled:cursor-default">›</button>
             </div>
           )}
           {kind === 'CUSTOM' && (
-            <div className="flex items-center gap-1 text-xs font-mono">
+            <div className="flex items-center gap-1 text-xs tabular-nums">
               <input type="date" value={from} onChange={e => setFrom(e.target.value)} className="px-2 py-1 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-main)]" />
               <span>–</span>
               <input type="date" value={to} onChange={e => setTo(e.target.value)} className="px-2 py-1 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-main)]" />
             </div>
           )}
-          <span className="text-xs font-black font-mono text-[var(--text-primary)]">{range.label}</span>
-          {prevRange && <span className={`text-[11px] font-mono ${MUTED}`}>so với {prevRange.label}</span>}
+          <span className="text-xs font-black tabular-nums text-[var(--text-primary)]">{range.label}</span>
+          {prevRange && <span className={`text-[11px] tabular-nums ${MUTED}`}>so với {prevRange.label}</span>}
           {onShowLegacy && (
-            <button type="button" onClick={onShowLegacy} className={`ml-auto text-[11px] font-bold ${MUTED} hover:text-[#4a6152] cursor-pointer`}>Bản cũ</button>
+            <button type="button" onClick={onShowLegacy} className={`ml-auto text-[11px] font-bold ${MUTED} hover:text-[#2e6b4a] cursor-pointer`}>Bản cũ</button>
           )}
         </div>
         <nav className="flex items-center gap-1 overflow-x-auto">
           {NAV.map(([id, label]) => (
             <a key={id} href={`#${id}`} onClick={e => { e.preventDefault(); document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
-              className={`px-3 py-1 rounded-full text-[11px] font-bold whitespace-nowrap ${MUTED} hover:text-[#4a6152] bg-[var(--bg-subtle)]`}>{label}</a>
+              className={`px-3 py-1 rounded-full text-[11px] font-bold whitespace-nowrap ${MUTED} hover:text-[#2e6b4a] bg-[var(--bg-subtle)]`}>{label}</a>
           ))}
         </nav>
       </div>
@@ -154,20 +154,20 @@ export const ReportsView: React.FC<Props> = ({
           <>
             <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3">
               {kpis.map(k => k.label === 'Chuỗi thắng / thua' ? (
-                <Stat key={k.label} label={k.label} value={<><span className="text-[#4a6152]">{cur.maxWinStreak}</span> / <span className="text-[#825249]">{cur.maxLossStreak}</span></>} />
+                <Stat key={k.label} label={k.label} value={<><span className="text-[#2e6b4a]">{cur.maxWinStreak}</span> / <span className="text-[#a3402f]">{cur.maxLossStreak}</span></>} />
               ) : (
                 <Stat key={k.label} label={k.label} value={k.cur === null ? '—' : k.show(k.cur)} cls={k.cls}
                   sub={prevRange ? <Delta cur={k.cur} prev={k.prev} fmt={k.fmt} neutral={k.neutral} /> : undefined} />
               ))}
             </div>
-            <div className={`text-[11px] font-mono mt-2 ${MUTED}`}>
+            <div className={`text-[11px] tabular-nums mt-2 ${MUTED}`}>
               {cur.wins} thắng · {cur.losses} thua · {cur.be} hòa · R đo trên {cur.rCount}/{cur.count} lệnh có SL
               {initialBalance <= 0 && ' · Chưa có vốn ban đầu của tài khoản'}
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4">
               <div>
-                <div className={`text-[11px] font-bold uppercase tracking-wider mb-1 ${MUTED}`}>Số dư & sụt giảm</div>
+                <div className={`text-[12px] font-semibold mb-1 ${MUTED}`}>Số dư & sụt giảm</div>
                 <div className="h-56">
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={eq.points} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
@@ -176,14 +176,14 @@ export const ReportsView: React.FC<Props> = ({
                       <YAxis yAxisId="b" tick={{ fontSize: 10 }} domain={['auto', 'auto']} width={60} />
                       <YAxis yAxisId="d" orientation="right" tick={{ fontSize: 10 }} width={50} />
                       <Tooltip formatter={(v: any, n: any) => [`$${Number(v).toFixed(2)}`, n === 'balance' ? 'Số dư' : 'Dưới đỉnh']} />
-                      <Area yAxisId="d" dataKey="drawdown" stroke="#825249" fill="#825249" fillOpacity={0.15} />
-                      <Line yAxisId="b" dataKey="balance" stroke="#4a6152" strokeWidth={2} dot={false} />
+                      <Area yAxisId="d" dataKey="drawdown" stroke="#a3402f" fill="#a3402f" fillOpacity={0.15} />
+                      <Line yAxisId="b" dataKey="balance" stroke="#2e6b4a" strokeWidth={2} dot={false} />
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
               </div>
               <div>
-                <div className={`text-[11px] font-bold uppercase tracking-wider mb-1 ${MUTED}`}>Lãi / lỗ theo ngày</div>
+                <div className={`text-[12px] font-semibold mb-1 ${MUTED}`}>Lãi / lỗ theo ngày</div>
                 <div className="h-56">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={days} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
@@ -193,7 +193,7 @@ export const ReportsView: React.FC<Props> = ({
                       <Tooltip formatter={(v: any) => [fmtMoney(Number(v)), 'PnL']} />
                       <ReferenceLine y={0} stroke="var(--border-main)" />
                       <Bar dataKey="net" radius={[3, 3, 0, 0]}>
-                        {days.map(d => <Cell key={d.label} fill={d.net >= 0 ? '#4a6152' : '#825249'} />)}
+                        {days.map(d => <Cell key={d.label} fill={d.net >= 0 ? '#2e6b4a' : '#a3402f'} />)}
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
