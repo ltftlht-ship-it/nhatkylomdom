@@ -56,7 +56,6 @@ import {
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { HistoryTable } from './components/HistoryTable';
-import { PendingOrdersTable } from './components/PendingOrdersTable';
 import { TradeDetailCard } from './components/TradeDetailCard';
 import { SettingsModal } from './components/SettingsModal';
 import { ChecklistEditorModal } from './components/ChecklistEditorModal';
@@ -1142,64 +1141,6 @@ export default function App() {
       console.error('Lỗi khi hủy lệnh chờ trên Supabase:', err);
     }
   }, [selectedAccountId]);
-
-  // Assign plan to pending order
-  const handleAssignPlanToPendingOrder = (orderId: string, planId: string) => {
-    setPendingOrders(prev => prev.map(o => {
-      if (o.id === orderId) {
-        const p = plans.find(plan => plan.id === planId);
-        return {
-          ...o,
-          plan_id: planId,
-          plan_title: p?.title
-        };
-      }
-      return o;
-    }));
-  };
-
-  // Khớp lệnh pending order -> chuyển sang Bảng Lịch Sử chính và giữ nguyên Plan đã gán
-  const handleExecutePendingOrder = (orderId: string) => {
-    const order = pendingOrders.find(o => o.id === orderId);
-    if (!order) return;
-
-    // Simulate market fill prices
-    const openPrice = order.price;
-    const isBuy = order.type === 'BUY';
-    const closePrice = isBuy ? openPrice + 18.5 : openPrice - 18.5;
-    const grossPnl = isBuy ? (closePrice - openPrice) * order.volume * 100 : (openPrice - closePrice) * order.volume * 100;
-
-    const newFilledTrade = computeTradeMetrics({
-      id: `trade-filled-${Date.now()}`,
-      ticket: order.ticket,
-      position_id: order.ticket,
-      symbol: order.symbol,
-      type: order.type,
-      volume: order.volume,
-      open_price: openPrice,
-      close_price: closePrice,
-      initial_sl: order.sl,
-      pnl: Number(grossPnl.toFixed(2)),
-      commission: -2.5,
-      swap: 0,
-      open_time: new Date().toISOString().replace('T', ' ').slice(0, 19),
-      close_time: new Date(Date.now() + 3600000).toISOString().replace('T', ' ').slice(0, 19),
-      timeframe: 'M15',
-      session: determineSession(new Date().toISOString(), settings.timezone_offset_hours),
-      pre_checklist_ids: order.plan_id ? parseChecklistArray(plans.find(p => p.id === order.plan_id)?.checklist) : [],
-      post_checklist_ids: [],
-      notes: `Lệnh limit #${order.ticket} cào từ MT5 đã khớp tự động. ${order.notes || ''}`,
-      plan_id: order.plan_id, // Giữ nguyên Plan đã gán!
-      status: 'CLOSED',
-      running_balance: activeAccount.balance + grossPnl,
-      setups: ['POI sau IDM'],
-    }, settings.contract_sizes, settings.timezone_offset_hours);
-
-    // Add to trades, remove from pending
-    setTrades(prev => [newFilledTrade, ...prev]);
-    setPendingOrders(prev => prev.filter(o => o.id !== orderId));
-    setSelectedTradeId(newFilledTrade.id);
-  };
 
   // Import trades handler
   const handleImportTrades = (newTrades: TradeRow[]) => {

@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, ZoomIn, Download } from 'lucide-react';
+import { resolveImageRef } from '../utils/imageUtils';
 
 interface ImageViewerModalProps {
   isOpen: boolean;
@@ -15,6 +16,14 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
   title,
 }) => {
   // Listen for Escape key to quickly exit viewer
+  // Ảnh trong kho riêng tư (sb://journal/...) đổi sang link xem tạm
+  const [resolvedUrl, setResolvedUrl] = React.useState('');
+  React.useEffect(() => {
+    let alive = true;
+    resolveImageRef(imageUrl).then(u => { if (alive) setResolvedUrl(u); });
+    return () => { alive = false; };
+  }, [imageUrl]);
+
   React.useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -26,7 +35,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen || !imageUrl) return null;
+  if (!isOpen || !resolvedUrl) return null;
 
   return (
     <div 
@@ -41,7 +50,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         <span className="font-bold text-slate-200 text-sm truncate pr-2">{title}</span>
         <div className="flex items-center gap-2 shrink-0">
           <a
-            href={imageUrl}
+            href={resolvedUrl}
             download="trade-chart.png"
             onClick={(e) => e.stopPropagation()}
             className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
@@ -66,7 +75,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         onClick={onClose}
       >
         <img
-          src={imageUrl}
+          src={resolvedUrl}
           alt={title}
           onClick={onClose}
           className="max-h-[85vh] max-w-full object-contain rounded shadow-2xl border border-slate-800/80 cursor-pointer transition-transform hover:opacity-95"

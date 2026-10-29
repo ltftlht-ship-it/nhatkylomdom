@@ -19,6 +19,7 @@ import {
   getSavedTimeframeOptions
 } from '../utils/tradeCalculations';
 import { compressImage, uploadImageToSupabaseStorage, normalizeImageSource } from '../utils/imageUtils';
+import { JournalImg } from './JournalImg';
 import { fetchPlansForTrade, saveTradeJournalToLocalCache, getTradeJournalFromLocalCache } from '../lib/supabase';
 import { 
   FolderOpen, 
@@ -1239,7 +1240,7 @@ export const TradeDetailCard: React.FC<TradeDetailCardProps> = ({
 
         <div className="flex-1 flex items-center justify-center m-2 rounded-xl relative clay-well overflow-hidden bg-black/5 min-h-[140px]">
           {preTradeImage ? (
-            <img
+            <JournalImg
               src={preTradeImage}
               alt="Pre-Trade Analysis"
               className="w-full h-full object-cover rounded-xl cursor-pointer transition-transform hover:scale-[1.01]"
@@ -1328,7 +1329,7 @@ export const TradeDetailCard: React.FC<TradeDetailCardProps> = ({
 
         <div className="flex-1 flex items-center justify-center m-2 rounded-xl relative clay-well overflow-hidden bg-black/5 min-h-[140px]">
           {postTradeImage ? (
-            <img
+            <JournalImg
               src={postTradeImage}
               alt="Post-Trade Close"
               className="w-full h-full object-cover rounded-xl cursor-pointer transition-transform hover:scale-[1.01]"

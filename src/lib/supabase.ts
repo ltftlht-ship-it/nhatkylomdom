@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
 import { TradingPlan } from '../types';
 import { parseChecklistArray } from '../utils/tradeCalculations';
+import { uploadDataUrlToStorage } from '../utils/imageUtils';
 
 // Theo dõi các cột thực tế tồn tại trong bảng trades của Supabase
 export const knownTradesColumns = new Set<string>();
@@ -124,6 +125,9 @@ export interface SupabaseTradeRow {
   image_base64?: string;
   htf_image_url?: string;
   ltf_image_url?: string;
+  pre_image_url?: string | null;
+  post_image_url?: string | null;
+  pre_image?: string;
   pre_checklist_ids?: string[];
   post_checklist_ids?: string[];
   setup?: string;
@@ -541,7 +545,12 @@ export async function fetchTradesFromSupabase(
   // Tích hợp dữ liệu từ local cache nếu Supabase chưa có (phòng khi vừa tick nhưng mạng chập chờn)
   const enrichedData = filteredData.map(item => {
     const cached = getTradeJournalFromLocalCache(item.ticket);
-    if (!cached) return item;
+    if (!cached) {
+      // Ảnh Thầy lưu trong kho riêng tư (cột riêng, không lẫn với ảnh EA)
+      if (item.pre_image_url) { item.htf_image_url = item.pre_image_url; item.pre_image = item.pre_image_url; }
+      if (item.post_image_url) { item.ltf_image_url = item.post_image_url; item.image_base64 = item.post_image_url; }
+      return item;
+    }
     const hasPre = item.pre_checklist_ids && (Array.isArray(item.pre_checklist_ids) ? item.pre_checklist_ids.length > 0 : String(item.pre_checklist_ids).length > 2);
     const hasPost = item.post_checklist_ids && (Array.isArray(item.post_checklist_ids) ? item.post_checklist_ids.length > 0 : String(item.post_checklist_ids).length > 2);
     const cachedHtf = cached.htf_image_url || cached.pre_image || '';
@@ -555,12 +564,12 @@ export async function fetchTradesFromSupabase(
       timeframe: item.timeframe || cached.timeframe,
       plan_id: item.plan_id || cached.plan_id,
       plan_name: item.plan_name || cached.plan_name,
-      // Box 1: CHỈ nhận htf_image_url do user lưu, TUYỆT ĐỐI không lấy image_url_1 từ MT5!
-      htf_image_url: cachedHtf || (item.htf_image_url && item.htf_image_url !== item.image_url_1 ? item.htf_image_url : ''),
-      pre_image: cachedHtf || '',
-      // Box 2: Nhận ảnh đóng lệnh từ cache hoặc MT5
-      ltf_image_url: cachedLtf || item.ltf_image_url || item.image_base64 || item.image_url_1 || '',
-      image_base64: cachedLtf || item.image_base64 || item.ltf_image_url || item.image_url_1 || '',
+      // Box 1: ảnh trước lệnh Thầy lưu (kho riêng tư) -> cache cũ trong máy; TUYỆT ĐỐI không lấy ảnh EA
+      htf_image_url: item.pre_image_url || cachedHtf || (item.htf_image_url && item.htf_image_url !== item.image_url_1 ? item.htf_image_url : ''),
+      pre_image: item.pre_image_url || cachedHtf || '',
+      // Box 2: ảnh sau lệnh Thầy lưu -> cache cũ -> ảnh chụp tự động của EA
+      ltf_image_url: item.post_image_url || cachedLtf || item.ltf_image_url || item.image_base64 || item.image_url_1 || '',
+      image_base64: item.post_image_url || cachedLtf || item.image_base64 || item.ltf_image_url || item.image_url_1 || '',
     };
   });
 
@@ -584,6 +593,7 @@ const TRADE_LIGHT_COLUMNS = [
   'open_price', 'close_price', 'pnl', 'commission', 'swap', 'initial_balance', 'current_balance',
   'status', 'open_time', 'close_time', 'sl', 'initial_sl', 'tp', 'initial_tp', 'plan_id', 'timeframe',
   'setup', 'notes', 'checklist', 'mistake_tags', 'mae_price', 'mfe_price', 'sl_change_count', 'duration_seconds',
+  'pre_image_url', 'post_image_url',
 ].join(',');
 
 const tradeHeavyCache = new Map<string, Partial<Record<HeavyColumn, any>>>();
@@ -1031,7 +1041,15 @@ export async function savePlanToSupabase(plan: TradingPlan): Promise<{ success: 
   try {
     const client = getSupabaseClient();
     if (client) {
-      const safeImageUrl = safePlan.image_url || null;
+      // Ảnh plan dạng base64 -> tải lên kho ảnh riêng tư, trong bảng chỉ lưu tham chiếu (nhẹ, không lộ)
+      let safeImageUrl = safePlan.image_url || null;
+      if (safeImageUrl && safeImageUrl.startsWith('data:')) {
+        const ref = await uploadDataUrlToStorage(safeImageUrl);
+        if (ref) {
+          safeImageUrl = ref;
+          safePlan.image_url = ref;
+        }
+      }
       const payload = {
         id: safePlan.id,
         account_id: safePlan.account_id ? String(safePlan.account_id).replace(/^acc-/, '').trim() : null,
@@ -1227,17 +1245,16 @@ export async function updateTradeJournalOnSupabase(
     if ('mfe_r' in updates && updates.mfe_r !== undefined) candidatePayload.mfe_r = updates.mfe_r;
     if ('mae_r' in updates && updates.mae_r !== undefined) candidatePayload.mae_r = updates.mae_r;
 
-    // Lưu URL ảnh
-    const rawPreImg = updates.image_url_1 || updates.htf_image_url;
+    // Ảnh Thầy thêm (tham chiếu kho ảnh riêng tư sb://journal/...) lưu vào cột riêng,
+    // KHÔNG ghi đè image_url_1 là ảnh chụp tự động của EA
+    const rawPreImg = updates.htf_image_url || updates.image_url_1;
     if (rawPreImg && typeof rawPreImg === 'string' && !rawPreImg.startsWith('data:')) {
-      candidatePayload.image_url_1 = rawPreImg;
-      candidatePayload.htf_image_url = rawPreImg;
+      candidatePayload.pre_image_url = rawPreImg;
     }
 
     const rawPostImg = updates.ltf_image_url || updates.image_base64;
-    if (rawPostImg && typeof rawPostImg === 'string' && !rawPostImg.startsWith('data:')) {
-      candidatePayload.ltf_image_url = rawPostImg;
-      candidatePayload.image_base64 = rawPostImg;
+    if (rawPostImg && typeof rawPostImg === 'string' && !rawPostImg.startsWith('data:') && rawPostImg.startsWith('sb://')) {
+      candidatePayload.post_image_url = rawPostImg;
     }
 
     // Safety Clean: Tuyệt đối không để lọt trường raw hay base64
@@ -1308,6 +1325,9 @@ export async function updateTradeJournalOnSupabase(
       } else {
         query = query.eq('ticket', cleanTicket);
       }
+      // Chỉ ghi vào đúng tài khoản MT5 (tránh trùng số ticket giữa các sàn)
+      const cleanAcc = String(targetAccountId || '').replace(/^acc-/, '').trim();
+      if (cleanAcc && cleanAcc !== 'ALL') query = query.eq('account_id', cleanAcc);
 
       const { data, error } = await query.select('ticket');
       if (!error) {

@@ -4,6 +4,7 @@ import { TradingPlan, PreChecklistItem, PostMistakeItem, SetupTagItem } from '..
 import { compressImage, uploadImageToSupabaseStorage, readImageFromClipboard } from '../utils/imageUtils';
 import { getSavedTimeframeOptions, parseChecklistArray } from '../utils/tradeCalculations';
 import { generateValidUUID } from '../lib/supabase';
+import { JournalImg } from './JournalImg';
 import { 
   Plus, 
   Search, 
@@ -794,7 +795,7 @@ export const PlansTab: React.FC<PlansTabProps> = ({
                       onClick={() => imageBoxRef.current?.focus()}
                     >
                       {planImage ? (
-                        <img
+                        <JournalImg
                           src={planImage}
                           alt="Plan Chart Preview"
                           className="max-h-56 w-auto object-contain rounded-lg cursor-pointer"
@@ -986,7 +987,7 @@ export const PlansTab: React.FC<PlansTabProps> = ({
                               onViewImage(plan.image_url!, plan.plan_name || plan.symbol);
                             }}
                           >
-                            <img src={plan.image_url} alt="Chart" className="w-full h-full object-cover" />
+                            <JournalImg src={plan.image_url} alt="Chart" className="w-full h-full object-cover" />
                           </div>
                           <span 
                             onClick={(e) => {

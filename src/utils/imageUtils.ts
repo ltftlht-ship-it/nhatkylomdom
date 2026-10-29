@@ -83,44 +83,64 @@ export async function compressImage(
 }
 
 /**
- * Upload ảnh lên Supabase Storage (nếu Storage Bucket được cấu hình):
- * - Lưu file vào bucket (mặc định 'trade-images' hoặc 'plans')
- * - Trả về publicUrl hoặc path reference
- * - Nếu Storage chưa được tạo trên Supabase project của user: trả về null và không làm crash app.
+ * KHO ẢNH NHẬT KÝ RIÊNG TƯ (bucket 'journal', xem supabase/journal_storage.sql)
+ * Ảnh lưu trong thư mục mang id người dùng; trong cơ sở dữ liệu chỉ lưu tham chiếu "sb://journal/<đường dẫn>".
+ * Khi hiển thị mới xin link tạm (hết hạn sau 1 giờ), người khác không mở được.
  */
-export async function uploadImageToSupabaseStorage(
-  blob: Blob,
-  fileName: string,
-  bucketName: string = 'trade-images'
-): Promise<string | null> {
+const JOURNAL_BUCKET = 'journal';
+const REF_PREFIX = `sb://${JOURNAL_BUCKET}/`;
+
+export const isJournalRef = (s?: string | null) => Boolean(s && s.startsWith(REF_PREFIX));
+
+/** Tải ảnh lên kho riêng tư. Trả về tham chiếu sb://... hoặc null nếu lỗi / chưa đăng nhập. */
+export async function uploadImageToSupabaseStorage(blob: Blob, _fileName?: string): Promise<string | null> {
   const client = getSupabaseClient();
-  if (!client || !client.storage) {
-    return null;
-  }
-
+  if (!client?.storage) return null;
   try {
-    const cleanFileName = `${Date.now()}_${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-    const { data, error } = await client.storage
-      .from(bucketName)
-      .upload(cleanFileName, blob, {
-        contentType: blob.type || 'image/webp',
-        upsert: true,
-      });
-
+    const { data: { session } } = await client.auth.getSession();
+    const uid = session?.user?.id;
+    if (!uid) return null;
+    const ext = blob.type === 'image/jpeg' ? 'jpg' : blob.type === 'image/png' ? 'png' : 'webp';
+    const path = `${uid}/${crypto.randomUUID()}.${ext}`;
+    const { error } = await client.storage.from(JOURNAL_BUCKET).upload(path, blob, {
+      contentType: blob.type || 'image/webp',
+      upsert: false,
+    });
     if (error) {
-      console.warn(`[Storage] Upload vào bucket '${bucketName}' không thành công:`, error.message);
+      console.warn('[Storage] Không tải được ảnh lên kho riêng tư:', error.message);
       return null;
     }
-
-    if (data?.path) {
-      const { data: urlData } = client.storage.from(bucketName).getPublicUrl(data.path);
-      return urlData?.publicUrl || data.path;
-    }
-    return null;
+    return REF_PREFIX + path;
   } catch (err: any) {
-    console.warn('[Storage] Ngoại lệ khi upload ảnh lên Supabase Storage:', err?.message || err);
+    console.warn('[Storage] Ngoại lệ khi tải ảnh:', err?.message || err);
     return null;
   }
+}
+
+/** Ảnh dạng base64 (dán / chọn file) -> tải lên kho riêng tư, trả về tham chiếu sb://... */
+export async function uploadDataUrlToStorage(dataUrl: string): Promise<string | null> {
+  try {
+    const blob = await (await fetch(dataUrl)).blob();
+    return await uploadImageToSupabaseStorage(blob);
+  } catch {
+    return null;
+  }
+}
+
+const signedCache = new Map<string, { url: string; exp: number }>();
+
+/** Đổi tham chiếu sb://... thành link xem tạm; ảnh dạng khác giữ nguyên */
+export async function resolveImageRef(src?: string | null): Promise<string> {
+  if (!src) return '';
+  if (!isJournalRef(src)) return normalizeImageSource(src);
+  const hit = signedCache.get(src);
+  if (hit && hit.exp > Date.now()) return hit.url;
+  const client = getSupabaseClient();
+  if (!client) return '';
+  const { data, error } = await client.storage.from(JOURNAL_BUCKET).createSignedUrl(src.slice(REF_PREFIX.length), 3600);
+  if (error || !data?.signedUrl) return '';
+  signedCache.set(src, { url: data.signedUrl, exp: Date.now() + 50 * 60 * 1000 });
+  return data.signedUrl;
 }
 
 /**
