@@ -45,6 +45,8 @@ import {
 import { TradeRow, AccountInfo, TradingPlan, PreChecklistItem } from '../types';
 import { useLanguage } from '../context/LanguageContext';
 import { determineSession, groupTradesByPosition, isNoiseTrade, getSavedTimezoneOffset, formatDateTimeWithOffset, calculateRisk1R } from '../utils/tradeCalculations';
+import { PeriodKind, getPeriodRange, getPreviousRange, filterTradesByRange } from '../utils/reportPeriods';
+import { ReportPeriodPanels } from './reports/ReportPeriodPanels';
 
 interface ReportsTabProps {
   trades: TradeRow[];
@@ -218,9 +220,27 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
   const activeOffset = timezoneOffset !== undefined ? timezoneOffset : getSavedTimezoneOffset();
 
   // Sub-tabs / Modules View Controller - Default is 'ALL'
-  const [activeSection, setActiveSection] = useState<'ALL' | 'WHAT_IF' | 'MFE_MAE' | 'PARTIAL_SCALE' | 'PSYCHOLOGY' | 'INSTRUMENTS' | 'DISCIPLINE' | 'CAPITAL'>(() => {
+  const [activeSection, setActiveSection] = useState<'ALL' | 'PERIOD' | 'WHAT_IF' | 'MFE_MAE' | 'PARTIAL_SCALE' | 'PSYCHOLOGY' | 'INSTRUMENTS' | 'DISCIPLINE' | 'CAPITAL'>(() => {
     return (localStorage.getItem('deal_report_section') as any) || 'ALL';
   });
+
+  // Kỳ báo cáo: toàn bộ các mục bên dưới đều tính theo kỳ đang chọn
+  const [periodKind, setPeriodKind] = useState<PeriodKind>(() => {
+    try { return (localStorage.getItem('bd_report_period') as PeriodKind) || 'ALL'; } catch { return 'ALL'; }
+  });
+  const [periodStep, setPeriodStep] = useState(0);
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const changePeriodKind = (k: PeriodKind) => {
+    setPeriodKind(k);
+    setPeriodStep(0);
+    try { localStorage.setItem('bd_report_period', k); } catch {}
+  };
+  const periodRange = useMemo(
+    () => getPeriodRange(periodKind, periodStep, new Date(), { from: customFrom, to: customTo }),
+    [periodKind, periodStep, customFrom, customTo]
+  );
+  const prevPeriodRange = useMemo(() => getPreviousRange(periodKind, periodStep, periodRange), [periodKind, periodStep, periodRange]);
 
   useEffect(() => {
     const handleSectionChange = (e: any) => {
@@ -309,7 +329,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
   // =========================================================================
   // 0. CHUẨN HÓA DỮ LIỆU ĐÃ ĐÓNG (ISOLATION TUYỆT ĐỐI THEO TÀI KHOẢN MT5)
   // =========================================================================
-  const closedTrades = useMemo(() => {
+  const allClosedTrades = useMemo(() => {
     if (!trades || trades.length === 0) return [];
 
     const cleanActiveId = String(activeAccount?.id || '').replace(/^acc-/, '').trim();
@@ -405,6 +425,16 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
       return timeA - timeB;
     });
   }, [trades, activeAccount, viewMode, hideNoise]);
+
+  // Lệnh trong kỳ đang chọn (mọi mục báo cáo bên dưới dùng closedTrades) và kỳ trước để so sánh
+  const closedTrades = useMemo(
+    () => filterTradesByRange(allClosedTrades, periodRange, activeOffset),
+    [allClosedTrades, periodRange, activeOffset]
+  );
+  const prevClosedTrades = useMemo(
+    () => (prevPeriodRange ? filterTradesByRange(allClosedTrades, prevPeriodRange, activeOffset) : null),
+    [allClosedTrades, prevPeriodRange, activeOffset]
+  );
 
   // =========================================================================
   // 1. CHỈ SỐ RỦI RO CỐT LÕI & CHUỖI THẮNG / THUA (CORE RISK & STREAKS)
@@ -3730,6 +3760,7 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
           <div className="flex items-center gap-1 p-1 rounded-full bg-[var(--bg-subtle)] clay-well overflow-x-auto max-w-full">
             {[
               { id: 'ALL', label: language === 'vi' ? 'Tất cả' : 'All Modules' },
+              { id: 'PERIOD', label: language === 'vi' ? 'Tổng quan kỳ & Tâm lý' : 'Period & Psychology' },
               { id: 'WHAT_IF', label: language === 'vi' ? 'Giả lập What-If' : 'What-If Sim' },
               { id: 'MFE_MAE', label: language === 'vi' ? 'Hiệu Suất MFE & MAE' : 'MFE & MAE Excursion' },
               { id: 'PARTIAL_SCALE', label: language === 'vi' ? 'Cắt Lệnh Từng Phần' : 'Scale-Out TP' },
@@ -3754,6 +3785,54 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
           </div>
         </div>
       </div>
+
+      {/* KỲ BÁO CÁO: Tất cả / Tuần / Tháng / Quý / Tùy chọn */}
+      <div className="p-3 bg-[var(--bg-card)] rounded-3xl clay-card border border-[var(--border-main)] flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-1 p-1 rounded-full bg-[var(--bg-subtle)] clay-well">
+          {([['ALL', 'Tất cả'], ['WEEK', 'Tuần'], ['MONTH', 'Tháng'], ['QUARTER', 'Quý'], ['CUSTOM', 'Tùy chọn']] as [PeriodKind, string][]).map(([k, label]) => (
+            <button key={k} type="button" onClick={() => changePeriodKind(k)}
+              className={`px-3.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                periodKind === k ? 'bg-[var(--bg-card)] text-[#1d1b17] clay-pill font-black shadow-sm' : 'text-[var(--text-secondary)] hover:text-[#4a6152]'
+              }`}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {(periodKind === 'WEEK' || periodKind === 'MONTH' || periodKind === 'QUARTER') && (
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setPeriodStep(s => s - 1)}
+              className="w-7 h-7 rounded-full bg-[var(--bg-subtle)] clay-well text-sm font-black hover:text-[#4a6152] cursor-pointer">‹</button>
+            <button type="button" onClick={() => setPeriodStep(s => Math.min(0, s + 1))} disabled={periodStep >= 0}
+              className="w-7 h-7 rounded-full bg-[var(--bg-subtle)] clay-well text-sm font-black hover:text-[#4a6152] cursor-pointer disabled:opacity-40 disabled:cursor-default">›</button>
+          </div>
+        )}
+        {periodKind === 'CUSTOM' && (
+          <div className="flex items-center gap-2 text-xs font-mono">
+            <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
+              className="px-2 py-1 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-main)] text-[var(--text-primary)]" />
+            <span>–</span>
+            <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+              className="px-2 py-1 rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-main)] text-[var(--text-primary)]" />
+          </div>
+        )}
+        <span className="text-xs font-black font-mono text-[var(--text-primary)]">{periodRange.label}</span>
+      </div>
+
+      {(activeSection === 'ALL' || activeSection === 'PERIOD') && (
+        <ReportPeriodPanels
+          periodPositions={closedTrades}
+          prevPositions={prevClosedTrades}
+          allPositions={allClosedTrades}
+          periodLabel={periodRange.label}
+          prevLabel={prevPeriodRange ? prevPeriodRange.label : null}
+          offsetHours={activeOffset}
+          plansCount={plans.length}
+          checklistSize={preChecklist.length}
+          initialBalance={initialBalance}
+          accountId={String(activeAccount?.id || '')}
+          onSelectTrade={onSelectTrade}
+        />
+      )}
 
       {/* 2. TOP 6 KPI METRIC CARDS (Tactile Clay Pods) */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
