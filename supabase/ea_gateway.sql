@@ -5,7 +5,8 @@
 -- nhờ đó BƯỚC 3 (lock_tables.sql) khóa được bảng mà EA không bị chặn.
 -- =====================================================================
 
--- Mật mã EA: mỗi dòng cho phép 1 mật mã ghi lệnh vào đúng 1 số tài khoản MT5
+-- Mật mã EA: mỗi dòng cho phép 1 mật mã ghi lệnh vào đúng 1 số tài khoản MT5.
+-- account_id = '*' cho phép mật mã đó ghi vào MỌI tài khoản (chỉ dành cho Admin).
 create table if not exists public.ea_keys (
   secret     text not null,
   account_id text not null,
@@ -34,9 +35,9 @@ declare
   v_cols text;
   v_updates text;
 begin
-  if not exists (
+  if coalesce(p_row ->> 'account_id', '') = '' or not exists (
     select 1 from public.ea_keys
-     where secret = p_secret and account_id = p_row ->> 'account_id'
+     where secret = p_secret and account_id in (p_row ->> 'account_id', '*')
   ) then
     raise exception 'EA key khong hop le cho tai khoan %', p_row ->> 'account_id';
   end if;
@@ -67,8 +68,8 @@ security definer
 set search_path = public
 as $$
 begin
-  if not exists (
-    select 1 from public.ea_keys where secret = p_secret and account_id = p_account_id
+  if coalesce(p_account_id, '') = '' or not exists (
+    select 1 from public.ea_keys where secret = p_secret and account_id in (p_account_id, '*')
   ) then
     raise exception 'EA key khong hop le cho tai khoan %', p_account_id;
   end if;

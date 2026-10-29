@@ -8,6 +8,9 @@
 
 alter table public.trades enable row level security;
 
+-- Luật cũ (thời Antigravity) cho mọi người toàn quyền: phải xóa, nếu không bật RLS cũng vô tác dụng
+drop policy if exists "Allow public full access" on public.trades;
+
 drop policy if exists trades_admin_all on public.trades;
 create policy trades_admin_all on public.trades
   for all to authenticated

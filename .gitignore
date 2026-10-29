@@ -10,3 +10,4 @@ coverage/
 # Mat ma EA MT5 (chi luu tren may)
 *.local.sql
 mt5/*.local.mq5
+mt5/backup_*/
