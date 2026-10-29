@@ -36,6 +36,8 @@ import {
 import { 
   fetchTradesFromSupabase,
   subscribeToTradesRealtime,
+  fetchTradesSignature,
+  loadTradeHeavyFields,
   fetchPlansFromSupabase,
   savePlanToSupabase,
   updatePlanStatusOnSupabase,
@@ -800,16 +802,23 @@ export default function App() {
       loadTrades(selectedAccountIdRef.current, true);
     });
 
-    // 3. Heartbeat Auto-polling định kỳ mỗi 15 giây (chạy ngầm êm ái, đảm bảo 100% không sót lệnh)
-    const intervalId = setInterval(() => {
-      loadTrades(selectedAccountIdRef.current, true);
-    }, 15000);
-
-    // 4. Đồng bộ tức thì khi người dùng chuyển từ cửa sổ MT5 quay lại cửa sổ Web App
-    const handleFocusOrVisible = () => {
-      if (!document.hidden) {
+    // 3. Mỗi 60 giây chỉ hỏi "dấu vân tay" vài KB; có lệnh mới / thay đổi mới tải lại danh sách.
+    // (Trước đây tải lại toàn bộ 1,3MB mỗi 15 giây làm vượt hạn mức Egress của Supabase)
+    let lastSignature: string | null = null;
+    fetchTradesSignature().then(sig => { lastSignature = sig; });
+    const checkForChanges = async () => {
+      if (document.hidden) return;
+      const sig = await fetchTradesSignature();
+      if (sig !== null && lastSignature !== null && sig !== lastSignature) {
         loadTrades(selectedAccountIdRef.current, true);
       }
+      if (sig !== null) lastSignature = sig;
+    };
+    const intervalId = setInterval(checkForChanges, 60000);
+
+    // 4. Quay lại cửa sổ Web App từ MT5: kiểm tra thay đổi ngay
+    const handleFocusOrVisible = () => {
+      if (!document.hidden) checkForChanges();
     };
 
     window.addEventListener('focus', handleFocusOrVisible);
@@ -946,6 +955,34 @@ export default function App() {
     }
     return trades[0] || null;
   }, [trades, pendingOrders, selectedTradeId, selectedAccountId]);
+
+  // Ảnh chụp chart từ EA chỉ tải khi Thầy chọn xem lệnh (cả các lần cắt 1.1, 1.2... của vị thế đó)
+  const activeTradeKey = activeTrade ? `${activeTrade.account_id}|${activeTrade.position_id || activeTrade.ticket}` : '';
+  useEffect(() => {
+    if (!activeTrade || !authUser) return;
+    const acc = String(activeTrade.account_id || selectedAccountId);
+    const posId = String(activeTrade.position_id || activeTrade.ticket);
+    const tickets = Array.from(new Set<string>(
+      trades.filter(t => String(t.position_id || t.ticket) === posId).map(t => String(t.ticket)).concat(String(activeTrade.ticket))
+    ));
+    loadTradeHeavyFields(acc, tickets, 'image_url_1').then(changed => {
+      if (changed) loadTrades(selectedAccountIdRef.current, true);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTradeKey, authUser]);
+
+  // Nến M5 do EA ghi chỉ tải khi Tab Báo Cáo mở mục giả lập dời SL (cần nến của mọi lệnh), 1 lần mỗi phiên
+  useEffect(() => {
+    const onNeedCandles = () => {
+      const acc = selectedAccountIdRef.current;
+      if (!acc) return;
+      loadTradeHeavyFields(acc, null, 'candles').then(changed => {
+        if (changed) loadTrades(acc, true);
+      });
+    };
+    window.addEventListener('bd_need_trade_candles', onNeedCandles);
+    return () => window.removeEventListener('bd_need_trade_candles', onNeedCandles);
+  }, [loadTrades]);
 
   // Unique symbols list for Dropdown Filter
   const uniqueSymbols = useMemo(() => {

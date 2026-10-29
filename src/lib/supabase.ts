@@ -452,11 +452,19 @@ export async function fetchTradesFromSupabase(
   const { url } = getSupabaseCredentials();
   console.log("--> Supabase Project URL đang kết nối:", url);
 
-  // Lấy dữ liệu sắp xếp theo close_time mới nhất
-  let { data, error } = await client
+  // Chỉ tải cột số liệu (~10% dung lượng). Ảnh chụp chart và nến M5 tải riêng khi cần
+  // qua loadTradeHeavyFields để không vượt hạn mức Egress của Supabase.
+  let { data, error }: { data: any[] | null; error: any } = await client
     .from('trades')
-    .select('*')
+    .select(TRADE_LIGHT_COLUMNS)
     .order('close_time', { ascending: false });
+
+  // Bảng thiếu cột nào trong danh sách thì quay về tải đầy đủ như cũ
+  if (error && error.code === '42703') {
+    const full = await client.from('trades').select('*').order('close_time', { ascending: false });
+    data = full.data as any;
+    error = full.error;
+  }
 
   // Nếu gặp lỗi PGRST125 hoặc PGRST205, thử kiểm tra bảng 'Trades' (viết hoa chữ T)
   if (error && (error.code === 'PGRST125' || error.code === 'PGRST205' || error.code === 'PGRST200')) {
@@ -482,6 +490,13 @@ export async function fetchTradesFromSupabase(
 
   // Ghi nhận cấu trúc các cột thực tế của bảng trades để tối ưu khi update
   data.forEach(row => recordTradesTableColumns(row));
+  recordTradesTableColumns([...TRADE_HEAVY_COLUMNS]);
+
+  // Gắn lại ảnh / nến đã tải riêng trước đó (giữ trong bộ nhớ suốt phiên làm việc)
+  data.forEach((row: any) => {
+    const heavy = tradeHeavyCache.get(heavyKey(row.account_id, row.ticket));
+    if (heavy) Object.assign(row, heavy);
+  });
 
   // Phân quyền đa người dùng thương mại (Multi-tenant data isolation)
   // Supabase (RLS trong supabase/lock_tables.sql) chỉ trả về lệnh người dùng được phép xem.
@@ -557,6 +572,80 @@ export async function fetchTradesFromSupabase(
 
 // Alias for compatibility
 export const fetchClosedTradesFromSupabase = fetchTradesFromSupabase;
+
+// =====================================================================
+// TẢI NHẸ: cột nặng (ảnh base64, nến M5) chỉ tải khi Thầy xem lệnh / mở mục cần nến
+// =====================================================================
+const TRADE_HEAVY_COLUMNS = ['image_url_1', 'candles'] as const;
+type HeavyColumn = typeof TRADE_HEAVY_COLUMNS[number];
+
+const TRADE_LIGHT_COLUMNS = [
+  'id', 'created_at', 'account_id', 'ticket', 'position_id', 'symbol', 'type', 'volume',
+  'open_price', 'close_price', 'pnl', 'commission', 'swap', 'initial_balance', 'current_balance',
+  'status', 'open_time', 'close_time', 'sl', 'initial_sl', 'tp', 'initial_tp', 'plan_id', 'timeframe',
+  'setup', 'notes', 'checklist', 'mistake_tags', 'mae_price', 'mfe_price', 'sl_change_count', 'duration_seconds',
+].join(',');
+
+const tradeHeavyCache = new Map<string, Partial<Record<HeavyColumn, any>>>();
+const heavyLoadedForAccount = new Set<string>();
+const heavyKey = (acc: any, ticket: any) => `${String(acc ?? '').replace(/^acc-/, '').trim()}|${String(ticket ?? '').trim()}`;
+
+/**
+ * Tải cột nặng cho các ticket chỉ định (hoặc toàn bộ tài khoản khi tickets = null).
+ * Trả về true nếu có dữ liệu mới, để app nạp lại danh sách lệnh (bản nhẹ).
+ */
+export async function loadTradeHeavyFields(
+  accountId: string,
+  tickets: string[] | null,
+  column: HeavyColumn
+): Promise<boolean> {
+  const client = getSupabaseClient();
+  const acc = String(accountId || '').replace(/^acc-/, '').trim();
+  if (!client || !acc) return false;
+
+  const flag = `${acc}|${column}`;
+  if (tickets === null && heavyLoadedForAccount.has(flag)) return false;
+  const missing = tickets === null
+    ? null
+    : tickets.filter(t => !(column in (tradeHeavyCache.get(heavyKey(acc, t)) || {})));
+  if (missing && missing.length === 0) return false;
+
+  let query = client.from('trades').select(`account_id,ticket,${column}`).eq('account_id', acc);
+  if (missing) query = query.in('ticket', missing);
+  const { data, error } = await query;
+  if (error || !data) {
+    console.warn(`Không tải được ${column}:`, error?.message);
+    return false;
+  }
+  data.forEach((row: any) => {
+    const key = heavyKey(row.account_id, row.ticket);
+    tradeHeavyCache.set(key, { ...(tradeHeavyCache.get(key) || {}), [column]: row[column] });
+  });
+  // Ticket không có dòng trả về vẫn đánh dấu đã tải để không hỏi lại
+  missing?.forEach(t => {
+    const key = heavyKey(acc, t);
+    if (!tradeHeavyCache.has(key)) tradeHeavyCache.set(key, { [column]: null });
+  });
+  if (tickets === null) heavyLoadedForAccount.add(flag);
+  return data.some((row: any) => row[column]);
+}
+
+/**
+ * Dấu vân tay nhỏ của bảng lệnh (vài KB) để biết có lệnh mới / thay đổi hay không
+ * trước khi tải lại cả danh sách.
+ */
+export async function fetchTradesSignature(): Promise<string | null> {
+  const client = getSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('trades')
+    .select('account_id,ticket,status,pnl,close_time,plan_id,setup,notes,mfe_price');
+  if (error || !data) return null;
+  return data
+    .map((r: any) => `${r.account_id}|${r.ticket}|${r.status}|${r.pnl}|${r.close_time}|${r.plan_id}|${r.setup}|${(r.notes || '').length}|${r.mfe_price}`)
+    .sort()
+    .join(';');
+}
 
 /**
  * Lắng nghe thay đổi bảng trades theo thời gian thực (Supabase Realtime WebSocket)

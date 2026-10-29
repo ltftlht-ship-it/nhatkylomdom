@@ -291,6 +291,13 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
   const [continuousPage, setContinuousPage] = useState<number>(1);
   const [continuousPageSize, setContinuousPageSize] = useState<number>(10);
 
+  // Giả lập dời SL liên tục cần nến M5 của từng lệnh: báo app tải nến (1 lần mỗi phiên) khi mục này hiển thị
+  useEffect(() => {
+    if ((activeSection === 'ALL' || activeSection === 'PARTIAL_SCALE') && scaleOutSubMode === 'CONTINUOUS_TRAILING') {
+      window.dispatchEvent(new Event('bd_need_trade_candles'));
+    }
+  }, [activeSection, scaleOutSubMode, activeAccount?.id]);
+
   // Cấu hình mô-đun Rà soát Tâm lý Hậu "Hụt Ăn" (Post-MFE Greed Decay & Revenge Audit)
   const [psychologyMfeThreshold, setPsychologyMfeThreshold] = useState<number>(2.0); // MFE tối thiểu để coi là lệnh chạy ngon (mặc định 2.0R)
   const [psychologyCaptureRateMax, setPsychologyCaptureRateMax] = useState<number>(20); // Tỷ lệ giữ lãi tối đa để coi là hụt ăn (<= 20%, mất >= 80% đỉnh lãi)
