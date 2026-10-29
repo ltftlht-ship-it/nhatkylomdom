@@ -46,7 +46,6 @@ import { TradeRow, AccountInfo, TradingPlan, PreChecklistItem } from '../types';
 import { useLanguage } from '../context/LanguageContext';
 import { determineSession, groupTradesByPosition, isNoiseTrade, getSavedTimezoneOffset, formatDateTimeWithOffset, calculateRisk1R } from '../utils/tradeCalculations';
 import { PeriodKind, getPeriodRange, getPreviousRange, filterTradesByRange } from '../utils/reportPeriods';
-import { ReportPeriodPanels } from './reports/ReportPeriodPanels';
 
 interface ReportsTabProps {
   trades: TradeRow[];
@@ -437,10 +436,6 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
   const closedTrades = useMemo(
     () => filterTradesByRange(allClosedTrades, periodRange, activeOffset),
     [allClosedTrades, periodRange, activeOffset]
-  );
-  const prevClosedTrades = useMemo(
-    () => (prevPeriodRange ? filterTradesByRange(allClosedTrades, prevPeriodRange, activeOffset) : null),
-    [allClosedTrades, prevPeriodRange, activeOffset]
   );
 
   // =========================================================================
@@ -3767,7 +3762,6 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
           <div className="flex items-center gap-1 p-1 rounded-full bg-[var(--bg-subtle)] clay-well overflow-x-auto max-w-full">
             {[
               { id: 'ALL', label: language === 'vi' ? 'Tất cả' : 'All Modules' },
-              { id: 'PERIOD', label: language === 'vi' ? 'Tổng quan kỳ & Tâm lý' : 'Period & Psychology' },
               { id: 'WHAT_IF', label: language === 'vi' ? 'Giả lập What-If' : 'What-If Sim' },
               { id: 'MFE_MAE', label: language === 'vi' ? 'Hiệu Suất MFE & MAE' : 'MFE & MAE Excursion' },
               { id: 'PARTIAL_SCALE', label: language === 'vi' ? 'Cắt Lệnh Từng Phần' : 'Scale-Out TP' },
@@ -3825,21 +3819,6 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({
         <span className="text-xs font-black font-mono text-[var(--text-primary)]">{periodRange.label}</span>
       </div>
 
-      {(activeSection === 'ALL' || activeSection === 'PERIOD') && (
-        <ReportPeriodPanels
-          periodPositions={closedTrades}
-          prevPositions={prevClosedTrades}
-          allPositions={allClosedTrades}
-          periodLabel={periodRange.label}
-          prevLabel={prevPeriodRange ? prevPeriodRange.label : null}
-          offsetHours={activeOffset}
-          plansCount={plans.length}
-          checklistSize={preChecklist.length}
-          initialBalance={initialBalance}
-          accountId={String(activeAccount?.id || '')}
-          onSelectTrade={onSelectTrade}
-        />
-      )}
 
       {/* 2. TOP 6 KPI METRIC CARDS (Tactile Clay Pods) */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">

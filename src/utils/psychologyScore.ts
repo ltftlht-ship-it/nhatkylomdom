@@ -1,10 +1,10 @@
-import { TradeRow } from '../types';
-import { toDisplayDate, getPeriodRange, filterTradesByRange } from './reportPeriods';
+import { Position } from './reportPositions';
+import { getPeriodRange } from './reportPeriods';
 
 /**
- * ĐIỂM TÂM LÝ: mọi chỉ số tính 100% từ lệnh thật (đã gộp cắt từng phần thành 1 vị thế).
+ * ĐIỂM TÂM LÝ: mọi chỉ số tính 100% từ vị thế thật (cắt từng phần = 1 vị thế).
  * Ngưỡng là luật do Thầy đặt (chỉnh được), không phải số liệu giả định.
- * Chỉ số thiếu dữ liệu thì để trống (null), không lấp số.
+ * Chỉ số thiếu dữ liệu để trống (null); mẫu nhỏ hơn MIN_SAMPLE không tính vào điểm tổng.
  */
 
 export interface PsySettings {
@@ -25,12 +25,13 @@ export const DEFAULT_PSY_SETTINGS: PsySettings = {
   slTolerancePct: 10,
 };
 
+export const MIN_SAMPLE = 5;
+
 const PSY_SETTINGS_KEY = 'bd_psychology_settings';
 
 export function loadPsySettings(): PsySettings {
   try {
-    const saved = JSON.parse(localStorage.getItem(PSY_SETTINGS_KEY) || '{}');
-    return { ...DEFAULT_PSY_SETTINGS, ...saved };
+    return { ...DEFAULT_PSY_SETTINGS, ...JSON.parse(localStorage.getItem(PSY_SETTINGS_KEY) || '{}') };
   } catch {
     return DEFAULT_PSY_SETTINGS;
   }
@@ -43,19 +44,15 @@ export function savePsySettings(s: PsySettings) {
 export interface PsyMetric {
   id: string;
   name: string;
-  value: number | null;     // % (0-100) hoặc tỷ lệ lần (x)
+  value: number | null;     // % (0-100) hoặc số lần (x)
   unit: '%' | 'x';
   score: number | null;     // 0-100, null = chưa đủ dữ liệu
-  sample: number;           // số lệnh / ngày dùng để đo
+  sample: number;
   sampleUnit: 'lệnh' | 'ngày';
-  total: number;            // tổng số vị thế trong kỳ
-  offenders: TradeRow[];    // lệnh vi phạm (để bấm xem)
+  offenders: Position[];
   note?: string;
-  excluded?: boolean;       // không tính vào điểm tổng (mẫu nhỏ)
+  excluded?: boolean;       // mẫu nhỏ, không tính điểm tổng
 }
-
-// Số lệnh / ngày tối thiểu để một chỉ số được tính vào điểm tổng
-export const MIN_SAMPLE = 5;
 
 export interface PsyResult {
   metrics: PsyMetric[];
@@ -63,34 +60,11 @@ export interface PsyResult {
   level: string;
 }
 
-const net = (t: TradeRow) => (t.net_pnl !== undefined ? t.net_pnl : (t.pnl || 0));
-
-function riskOf(t: TradeRow): number {
-  return Number(t.initial_sl) > 0 && Number(t.risk_1r_usd) > 0 ? Number(t.risk_1r_usd) : 0;
-}
-
-/** R thực nhận theo lãi/lỗ gộp (trước phí) để so cùng thước đo giá với MFE */
-export function realizedR(t: TradeRow): number | null {
-  const risk = riskOf(t);
-  return risk > 0 ? (t.pnl || 0) / risk : null;
-}
-
-/** Đỉnh MFE quy ra R từ giá MFE thật do EA ghi */
-export function mfeR(t: TradeRow): number | null {
-  const open = Number(t.open_price);
-  const sl = Number(t.initial_sl);
-  const mfe = Number(t.mfe_price);
-  if (!(open > 0 && sl > 0 && mfe > 0)) return null;
-  if (Math.abs(mfe - open) >= open * 0.5) return null; // dữ liệu MFE lỗi
-  const slDist = Math.abs(open - sl);
-  if (slDist <= 0) return null;
-  const isBuy = String(t.type || '').toUpperCase().startsWith('BUY');
-  const fav = isBuy ? mfe - open : open - mfe;
-  return Math.max(0, fav) / slDist;
-}
-
 const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 const rateScore = (bad: number, sample: number) => (sample > 0 ? Math.round(100 - (bad / sample) * 100) : null);
+const rate = (bad: number, sample: number) => (sample > 0 ? (bad / sample) * 100 : null);
+const sumNet = (list: Position[]) => list.reduce((s, p) => s + p.net, 0);
+const money = (v: number) => `${v >= 0 ? '+' : '-'}$${Math.abs(v).toFixed(2)}`;
 
 export function psyLevel(score: number | null): string {
   if (score === null) return 'Chưa đủ dữ liệu';
@@ -100,225 +74,144 @@ export function psyLevel(score: number | null): string {
   return 'Mất kiểm soát';
 }
 
-export function computePsychology(
-  positions: TradeRow[],
-  settings: PsySettings,
-  offsetHours: number,
-  plansCount: number
-): PsyResult {
-  const rows = positions
-    .map(t => ({ t, o: toDisplayDate(t.open_time, offsetHours), c: toDisplayDate(t.close_time || t.open_time, offsetHours) }))
-    .filter(r => r.o && r.c) as { t: TradeRow; o: Date; c: Date }[];
-  rows.sort((a, b) => a.o.getTime() - b.o.getTime());
+export function computePsychology(positions: Position[], s: PsySettings, plansCount: number): PsyResult {
+  const rows = [...positions].sort((a, b) => a.openTime.getTime() - b.openTime.getTime());
   const total = rows.length;
   const metrics: PsyMetric[] = [];
-  const base = { total, offenders: [] as TradeRow[] };
+  const losses = rows.filter(p => p.net < 0);
 
   // 1. Trả thù: vào lệnh trong X phút sau khi một lệnh thua đóng
   {
-    const winMs = settings.revengeMinutes * 60 * 1000;
-    const losses = rows.filter(r => net(r.t) < 0);
-    const offenders = rows.filter(r => losses.some(l => l !== r && r.o.getTime() - l.c.getTime() >= 0 && r.o.getTime() - l.c.getTime() <= winMs)).map(r => r.t);
-    metrics.push({ ...base, id: 'revenge', name: 'Trả thù', unit: '%', sample: total, sampleUnit: 'lệnh',
-      value: total ? (offenders.length / total) * 100 : null, score: rateScore(offenders.length, total), offenders });
+    const win = s.revengeMinutes * 60000;
+    const offenders = rows.filter(p => losses.some(l => l !== p && p.openTime.getTime() - l.closeTime.getTime() >= 0 && p.openTime.getTime() - l.closeTime.getTime() <= win));
+    metrics.push({ id: 'revenge', name: 'Trả thù', unit: '%', sample: total, sampleUnit: 'lệnh', value: rate(offenders.length, total), score: rateScore(offenders.length, total), offenders });
   }
 
-  // 2. Tăng lot sau thua: lệnh kế tiếp sau một lệnh thua có lot lớn hơn lệnh vừa thua
+  // 2. Tăng lot sau thua: lệnh kế tiếp sau một lệnh thua có lot lớn hơn
   {
     let sample = 0;
-    const offenders: TradeRow[] = [];
-    rows.forEach(l => {
-      if (net(l.t) >= 0) return;
-      const next = rows.find(r => r.o.getTime() >= l.c.getTime() && r !== l);
+    const offenders: Position[] = [];
+    losses.forEach(l => {
+      const next = rows.find(p => p !== l && p.openTime.getTime() >= l.closeTime.getTime());
       if (!next) return;
       sample++;
-      if ((next.t.volume || 0) > (l.t.volume || 0)) offenders.push(next.t);
+      if (next.volume > l.volume) offenders.push(next);
     });
-    metrics.push({ ...base, id: 'lot_after_loss', name: 'Tăng lot sau thua', unit: '%', sample, sampleUnit: 'lệnh',
-      value: sample ? (offenders.length / sample) * 100 : null, score: rateScore(offenders.length, sample), offenders });
+    metrics.push({ id: 'lot_after_loss', name: 'Tăng lot sau thua', unit: '%', sample, sampleUnit: 'lệnh', value: rate(offenders.length, sample), score: rateScore(offenders.length, sample), offenders });
   }
 
-  // 3 & 4. Theo ngày: đánh quá tay, thua 2 lệnh liền vẫn đánh
-  const byDay = new Map<string, typeof rows>();
-  rows.forEach(r => {
-    const k = dayKey(r.o);
+  // 3 & 4. Theo ngày vào lệnh
+  const byDay = new Map<string, Position[]>();
+  rows.forEach(p => {
+    const k = dayKey(p.openTime);
     if (!byDay.has(k)) byDay.set(k, []);
-    byDay.get(k)!.push(r);
+    byDay.get(k)!.push(p);
   });
   {
     let badDays = 0;
-    const offenders: TradeRow[] = [];
+    const offenders: Position[] = [];
     byDay.forEach(list => {
-      if (list.length > settings.maxTradesPerDay) {
+      if (list.length > s.maxTradesPerDay) {
         badDays++;
-        offenders.push(...list.slice(settings.maxTradesPerDay).map(r => r.t));
+        offenders.push(...list.slice(s.maxTradesPerDay));
       }
     });
-    const extraNet = offenders.reduce((s, t) => s + net(t), 0);
-    metrics.push({ ...base, id: 'overtrade', name: 'Đánh quá tay', unit: '%', sample: byDay.size, sampleUnit: 'ngày',
-      value: byDay.size ? (badDays / byDay.size) * 100 : null, score: rateScore(badDays, byDay.size), offenders,
-      note: offenders.length ? `Lệnh vượt mức: ${offenders.length} lệnh, PnL ${extraNet >= 0 ? '+' : ''}${extraNet.toFixed(2)}$` : undefined });
+    metrics.push({ id: 'overtrade', name: 'Đánh quá tay', unit: '%', sample: byDay.size, sampleUnit: 'ngày', value: rate(badDays, byDay.size), score: rateScore(badDays, byDay.size), offenders,
+      note: offenders.length ? `Lệnh vượt mức: ${offenders.length} lệnh, PnL ${money(sumNet(offenders))}` : undefined });
   }
   {
-    let streakDays = 0;
-    let continuedDays = 0;
-    const offenders: TradeRow[] = [];
+    let streakDays = 0, continued = 0;
+    const offenders: Position[] = [];
     byDay.forEach(list => {
-      const byClose = [...list].sort((a, b) => a.c.getTime() - b.c.getTime());
+      const byClose = [...list].sort((a, b) => a.closeTime.getTime() - b.closeTime.getTime());
       for (let i = 1; i < byClose.length; i++) {
-        if (net(byClose[i - 1].t) < 0 && net(byClose[i].t) < 0) {
+        if (byClose[i - 1].net < 0 && byClose[i].net < 0) {
           streakDays++;
-          const after = list.filter(r => r.o.getTime() >= byClose[i].c.getTime());
-          if (after.length) {
-            continuedDays++;
-            offenders.push(...after.map(r => r.t));
-          }
+          const after = list.filter(p => p.openTime.getTime() >= byClose[i].closeTime.getTime());
+          if (after.length) { continued++; offenders.push(...after); }
           break;
         }
       }
     });
-    const afterNet = offenders.reduce((s, t) => s + net(t), 0);
-    metrics.push({ ...base, id: 'continue_after_losses', name: 'Thua 2 lệnh liền vẫn đánh', unit: '%', sample: streakDays, sampleUnit: 'ngày',
-      value: streakDays ? (continuedDays / streakDays) * 100 : null, score: rateScore(continuedDays, streakDays), offenders,
-      note: offenders.length ? `Lệnh đánh tiếp: ${offenders.length} lệnh, PnL ${afterNet >= 0 ? '+' : ''}${afterNet.toFixed(2)}$` : undefined });
+    metrics.push({ id: 'continue_after_losses', name: 'Thua 2 lệnh liền vẫn đánh', unit: '%', sample: streakDays, sampleUnit: 'ngày', value: rate(continued, streakDays), score: rateScore(continued, streakDays), offenders,
+      note: offenders.length ? `Lệnh đánh tiếp: ${offenders.length} lệnh, PnL ${money(sumNet(offenders))}` : undefined });
   }
 
   // 5. Không đặt SL
   {
-    const offenders = rows.filter(r => !(Number(r.t.initial_sl) > 0)).map(r => r.t);
-    metrics.push({ ...base, id: 'no_sl', name: 'Không đặt SL', unit: '%', sample: total, sampleUnit: 'lệnh',
-      value: total ? (offenders.length / total) * 100 : null, score: rateScore(offenders.length, total), offenders });
+    const offenders = rows.filter(p => !(p.sl > 0));
+    metrics.push({ id: 'no_sl', name: 'Không đặt SL', unit: '%', sample: total, sampleUnit: 'lệnh', value: rate(offenders.length, total), score: rateScore(offenders.length, total), offenders });
   }
 
-  // 6. Không tôn trọng SL: lệnh lỗ vượt quá 1R (đã trừ hao trượt giá)
+  // 6. Lỗ vượt 1R (SL bị dời / xóa / không tôn trọng)
   {
-    const losers = rows.filter(r => net(r.t) < 0 && riskOf(r.t) > 0);
-    const offenders = losers.filter(r => -(r.t.pnl || 0) > riskOf(r.t) * (1 + settings.slTolerancePct / 100)).map(r => r.t);
-    metrics.push({ ...base, id: 'sl_violation', name: 'Lỗ vượt 1R', unit: '%', sample: losers.length, sampleUnit: 'lệnh',
-      value: losers.length ? (offenders.length / losers.length) * 100 : null, score: rateScore(offenders.length, losers.length), offenders });
+    const withSl = losses.filter(p => p.risk > 0);
+    const offenders = withSl.filter(p => -p.gross > p.risk * (1 + s.slTolerancePct / 100));
+    metrics.push({ id: 'sl_violation', name: 'Lỗ vượt 1R', unit: '%', sample: withSl.length, sampleUnit: 'lệnh', value: rate(offenders.length, withSl.length), score: rateScore(offenders.length, withSl.length), offenders,
+      note: offenders.length ? `Lỗ thêm ngoài 1R: ${money(offenders.reduce((t, p) => t + (p.gross + p.risk), 0))}` : undefined });
   }
 
   // 7. Gồng lỗ: thời gian giữ lệnh thua ÷ thời gian giữ lệnh thắng
   {
-    const dur = (r: { o: Date; c: Date }) => Math.max(0, r.c.getTime() - r.o.getTime());
-    const w = rows.filter(r => net(r.t) > 0 && dur(r) > 0);
-    const l = rows.filter(r => net(r.t) < 0 && dur(r) > 0);
-    let value: number | null = null;
-    let score: number | null = null;
-    let offenders: TradeRow[] = [];
+    const w = rows.filter(p => p.net > 0 && p.durationMin > 0);
+    const l = rows.filter(p => p.net < 0 && p.durationMin > 0);
+    let value: number | null = null, score: number | null = null, offenders: Position[] = [];
     if (w.length && l.length) {
-      const avgW = w.reduce((s, r) => s + dur(r), 0) / w.length;
-      const avgL = l.reduce((s, r) => s + dur(r), 0) / l.length;
-      value = avgW > 0 ? avgL / avgW : null;
-      if (value !== null) {
+      const avgW = w.reduce((t, p) => t + p.durationMin, 0) / w.length;
+      const avgL = l.reduce((t, p) => t + p.durationMin, 0) / l.length;
+      if (avgW > 0) {
+        value = avgL / avgW;
         score = Math.round(Math.min(100, 100 / Math.max(value, 0.0001)));
-        offenders = l.filter(r => dur(r) > avgW).map(r => r.t);
+        offenders = l.filter(p => p.durationMin > avgW);
       }
     }
-    metrics.push({ ...base, id: 'hold_losers', name: 'Gồng lỗ', unit: 'x', sample: w.length + l.length, sampleUnit: 'lệnh',
-      value, score, offenders });
+    metrics.push({ id: 'hold_losers', name: 'Gồng lỗ', unit: 'x', sample: w.length + l.length, sampleUnit: 'lệnh', value, score, offenders });
   }
 
-  // 8 & 9. Cần dữ liệu MFE thật từ EA
-  const withMfe = rows.filter(r => mfeR(r.t) !== null && realizedR(r.t) !== null);
+  // 8 & 9. Cần MFE thật do EA ghi
+  const withMfe = rows.filter(p => p.mfeR !== null && p.grossR !== null);
   {
-    const offenders = withMfe.filter(r => (mfeR(r.t)! - realizedR(r.t)!) >= settings.greedGapR).map(r => r.t);
-    metrics.push({ ...base, id: 'greed', name: 'Hụt ăn', unit: '%', sample: withMfe.length, sampleUnit: 'lệnh',
-      value: withMfe.length ? (offenders.length / withMfe.length) * 100 : null, score: rateScore(offenders.length, withMfe.length), offenders });
+    const offenders = withMfe.filter(p => p.mfeR! - p.grossR! >= s.greedGapR);
+    metrics.push({ id: 'greed', name: 'Hụt ăn', unit: '%', sample: withMfe.length, sampleUnit: 'lệnh', value: rate(offenders.length, withMfe.length), score: rateScore(offenders.length, withMfe.length), offenders });
   }
   {
-    const winners = withMfe.filter(r => net(r.t) > 0);
-    const offenders = winners.filter(r => realizedR(r.t)! < settings.earlyExitMaxR && mfeR(r.t)! >= settings.earlyExitMfeR).map(r => r.t);
-    metrics.push({ ...base, id: 'early_exit', name: 'Cắt non', unit: '%', sample: winners.length, sampleUnit: 'lệnh',
-      value: winners.length ? (offenders.length / winners.length) * 100 : null, score: rateScore(offenders.length, winners.length), offenders });
+    const winners = withMfe.filter(p => p.net > 0);
+    const offenders = winners.filter(p => p.grossR! < s.earlyExitMaxR && p.mfeR! >= s.earlyExitMfeR);
+    metrics.push({ id: 'early_exit', name: 'Cắt non', unit: '%', sample: winners.length, sampleUnit: 'lệnh', value: rate(offenders.length, winners.length), score: rateScore(offenders.length, winners.length), offenders });
   }
 
-  // 10. Tuân thủ Plan (chỉ tính khi Thầy đã dùng Tab Kế Hoạch)
+  // 10. Vào lệnh ngoài plan (chỉ tính khi đã dùng Tab Kế Hoạch)
   {
-    const offenders = rows.filter(r => !r.t.plan_id).map(r => r.t);
     const active = plansCount > 0 && total > 0;
-    metrics.push({ ...base, id: 'no_plan', name: 'Vào lệnh ngoài plan', unit: '%', sample: active ? total : 0, sampleUnit: 'lệnh',
-      value: active ? (offenders.length / total) * 100 : null, score: active ? rateScore(offenders.length, total) : null,
-      offenders: active ? offenders : [], note: active ? undefined : 'Chưa có plan nào' });
+    const offenders = active ? rows.filter(p => !p.planId) : [];
+    metrics.push({ id: 'no_plan', name: 'Vào lệnh ngoài plan', unit: '%', sample: active ? total : 0, sampleUnit: 'lệnh',
+      value: active ? rate(offenders.length, total) : null, score: active ? rateScore(offenders.length, total) : null, offenders,
+      note: active ? undefined : 'Chưa có plan nào' });
   }
 
-  // Mẫu quá nhỏ thì vẫn hiện số nhưng không tính vào điểm tổng (tránh 1-2 lệnh kéo lệch điểm)
   metrics.forEach(m => {
     if (m.score !== null && m.sample < MIN_SAMPLE) {
-      m.note = `Mẫu nhỏ (${m.sample} ${m.sampleUnit}), không tính vào điểm tổng`;
       m.excluded = true;
+      m.note = `Mẫu nhỏ (${m.sample} ${m.sampleUnit}), không tính điểm tổng`;
     }
   });
   const scored = metrics.filter(m => m.score !== null && !m.excluded);
-  const score = scored.length ? Math.round(scored.reduce((s, m) => s + (m.score as number), 0) / scored.length) : null;
+  const score = scored.length ? Math.round(scored.reduce((t, m) => t + (m.score as number), 0) / scored.length) : null;
   return { metrics, score, level: psyLevel(score) };
 }
 
-export interface PeriodStats {
-  count: number;
-  wins: number;
-  losses: number;
-  winRate: number;
-  net: number;
-  grossProfit: number;
-  grossLoss: number;
-  profitFactor: number | null;
-  avgR: number | null;
-  rCount: number;
-}
-
-export function computePeriodStats(positions: TradeRow[]): PeriodStats {
-  let wins = 0, losses = 0, gp = 0, gl = 0, sumR = 0, rCount = 0;
-  positions.forEach(t => {
-    const n = net(t);
-    if (n > 0) { wins++; gp += n; } else if (n < 0) { losses++; gl += -n; }
-    const risk = riskOf(t);
-    if (risk > 0) { sumR += n / risk; rCount++; }
-  });
-  const count = positions.length;
-  return {
-    count, wins, losses,
-    winRate: count ? (wins / count) * 100 : 0,
-    net: gp - gl,
-    grossProfit: gp,
-    grossLoss: gl,
-    profitFactor: gl > 0 ? gp / gl : (gp > 0 ? null : 0),
-    avgR: rCount ? sumR / rCount : null,
-    rCount,
-  };
-}
-
-export function computePlanAdherence(positions: TradeRow[], checklistSize: number) {
-  const withPlan = positions.filter(t => t.plan_id);
-  const noPlan = positions.filter(t => !t.plan_id);
-  const withChecklist = positions.filter(t => Array.isArray(t.pre_checklist_ids) && t.pre_checklist_ids.length > 0);
-  const avgChecklist = checklistSize > 0 && withChecklist.length
-    ? withChecklist.reduce((s, t) => s + Math.min(1, t.pre_checklist_ids.length / checklistSize), 0) / withChecklist.length * 100
-    : null;
-  return {
-    withPlan: computePeriodStats(withPlan),
-    noPlan: computePeriodStats(noPlan),
-    pctWithPlan: positions.length ? (withPlan.length / positions.length) * 100 : 0,
-    checklistCount: withChecklist.length,
-    avgChecklist,
-  };
-}
-
-/** Điểm tâm lý từng tuần (8 tuần gần nhất) để xem xu hướng */
-export function computeWeeklyScores(
-  allPositions: TradeRow[],
-  settings: PsySettings,
-  offsetHours: number,
-  plansCount: number,
-  weeks = 8
-) {
+/** Điểm tâm lý từng tuần (theo giờ đóng lệnh) để xem xu hướng */
+export function computeWeeklyScores(all: Position[], s: PsySettings, plansCount: number, weeks = 8) {
   const out: { label: string; score: number | null; count: number }[] = [];
-  for (let s = -(weeks - 1); s <= 0; s++) {
-    const range = getPeriodRange('WEEK', s);
-    const list = filterTradesByRange(allPositions, range, offsetHours);
-    const res = computePsychology(list, settings, offsetHours, plansCount);
-    const d = range.start!;
-    out.push({ label: `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`, score: list.length ? res.score : null, count: list.length });
+  for (let step = -(weeks - 1); step <= 0; step++) {
+    const r = getPeriodRange('WEEK', step);
+    const list = all.filter(p => p.closeTime >= r.start! && p.closeTime < r.end!);
+    const d = r.start!;
+    out.push({
+      label: `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`,
+      score: list.length ? computePsychology(list, s, plansCount).score : null,
+      count: list.length,
+    });
   }
   return out;
 }
@@ -349,33 +242,25 @@ export function savePropRules(acc: string, rules: PropRules) {
   try { localStorage.setItem(propKey(acc), JSON.stringify(rules)); } catch {}
 }
 
-export function computePropStatus(allPositions: TradeRow[], initialBalance: number, offsetHours: number, now: Date = new Date()) {
+export function computePropStatus(all: Position[], initialBalance: number, now: Date = new Date()) {
+  const sorted = [...all].sort((a, b) => a.closeTime.getTime() - b.closeTime.getTime());
   const dayNet = new Map<string, number>();
-  const sorted = [...allPositions]
-    .map(t => ({ t, c: toDisplayDate(t.close_time || t.open_time, offsetHours) }))
-    .filter(r => r.c) as { t: TradeRow; c: Date }[];
-  sorted.sort((a, b) => a.c.getTime() - b.c.getTime());
-
   let balance = initialBalance;
   let lowest = initialBalance;
-  sorted.forEach(r => {
-    const n = net(r.t);
-    balance += n;
-    if (balance < lowest) lowest = balance;
-    const k = dayKey(r.c);
-    dayNet.set(k, (dayNet.get(k) || 0) + n);
+  sorted.forEach(p => {
+    balance += p.net;
+    lowest = Math.min(lowest, balance);
+    const k = dayKey(p.closeTime);
+    dayNet.set(k, (dayNet.get(k) || 0) + p.net);
   });
-
-  const todayNet = dayNet.get(dayKey(now)) || 0;
   const days = Array.from(dayNet.values());
-  const worstDay = days.length ? Math.min(...days) : 0;
   const bestDay = days.length ? Math.max(...days) : 0;
   const totalProfit = balance - initialBalance;
   return {
     balance,
     lowestBalance: lowest,
-    todayNet,
-    worstDay,
+    todayNet: dayNet.get(dayKey(now)) || 0,
+    worstDay: days.length ? Math.min(...days) : 0,
     bestDay,
     tradingDays: dayNet.size,
     totalProfit,

@@ -73,6 +73,7 @@ import { OverviewTab } from './components/OverviewTab';
 import { PlansTab } from './components/PlansTab';
 import { ChartTab } from './components/ChartTab';
 import { ReportsTab } from './components/ReportsTab';
+import { ReportsView } from './components/reports/ReportsView';
 import { SettingsTab } from './components/SettingsTab';
 import { Clock, Layers, Zap, CheckCircle2, Lock, Key, ShieldCheck } from 'lucide-react';
 
@@ -83,6 +84,9 @@ export default function App() {
     if (saved === 'bieu-do') return 'ke-hoach';
     return saved || 'lich-su';
   });
+
+  // Tạm giữ Tab Báo Cáo bản cũ để so sánh với bản mới
+  const [showLegacyReports, setShowLegacyReports] = useState(false);
 
   const handleTabChange = (tab: string) => {
     setCurrentTab(tab);
@@ -1578,20 +1582,41 @@ export default function App() {
           </div>
 
           {/* TAB BÁO CÁO */}
-          {currentTab === 'bao-cao' && (
-            <ReportsTab
+          {currentTab === 'bao-cao' && (showLegacyReports ? (
+            <div>
+              <button type="button" onClick={() => setShowLegacyReports(false)}
+                className="m-4 px-3 py-1 rounded-full text-xs font-bold bg-[var(--bg-subtle)] clay-well hover:text-[#4a6152] cursor-pointer">
+                ← Báo cáo mới
+              </button>
+              <ReportsTab
+                trades={trades}
+                activeAccount={activeAccount}
+                plans={plans}
+                hideNoiseRows={hideNoiseRows}
+                preChecklist={preChecklist}
+                timezoneOffset={settings.timezone_offset_hours}
+                onSelectTrade={(tr) => {
+                  setSelectedTradeId(tr?.id || tr?.ticket || null);
+                  setCurrentTab('lich-su');
+                }}
+              />
+            </div>
+          ) : (
+            <ReportsView
               trades={trades}
               activeAccount={activeAccount}
               plans={plans}
               hideNoiseRows={hideNoiseRows}
               preChecklist={preChecklist}
+              postMistakes={postMistakes}
               timezoneOffset={settings.timezone_offset_hours}
+              onShowLegacy={() => setShowLegacyReports(true)}
               onSelectTrade={(tr) => {
                 setSelectedTradeId(tr?.id || tr?.ticket || null);
                 setCurrentTab('lich-su');
               }}
             />
-          )}
+          ))}
 
           {/* TAB CÀI ĐẶT */}
           {currentTab === 'cai-dat' && (
