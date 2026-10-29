@@ -74,6 +74,7 @@ import { PlansTab } from './components/PlansTab';
 import { ChartTab } from './components/ChartTab';
 import { ReportsTab } from './components/ReportsTab';
 import { ReportsView } from './components/reports/ReportsView';
+import { startSettingsSync, stopSettingsSync } from './lib/userSettings';
 import { SettingsTab } from './components/SettingsTab';
 import { Clock, Layers, Zap, CheckCircle2, Lock, Key, ShieldCheck } from 'lucide-react';
 
@@ -421,6 +422,21 @@ export default function App() {
       }
     };
   }, []);
+
+  // Đồng bộ cấu hình (checklist, setup, ngưỡng tâm lý, luật quỹ, bù giờ...) với Supabase theo tài khoản đăng nhập
+  useEffect(() => {
+    if (!authUser?.id || authUser.aud !== 'authenticated') {
+      stopSettingsSync();
+      return;
+    }
+    startSettingsSync(authUser.id).then(changed => {
+      // Cấu hình mới kéo về từ máy khác: tải lại 1 lần để mọi tab dùng cấu hình mới
+      if (changed && !sessionStorage.getItem('bd_settings_reloaded')) {
+        sessionStorage.setItem('bd_settings_reloaded', '1');
+        window.location.reload();
+      }
+    });
+  }, [authUser?.id]);
 
   // Search filter
   const [searchQuery, setSearchQuery] = useState('');
