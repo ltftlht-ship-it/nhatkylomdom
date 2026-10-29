@@ -2,6 +2,7 @@ import React from 'react';
 import { Settings as SettingsIcon, Clock, Database, Shield, Zap, Key } from 'lucide-react';
 import { AppSettings, AccountInfo } from '../types';
 import { saveTimezoneOffset, formatDateTimeWithOffset } from '../utils/tradeCalculations';
+import { NotifySettingsCard } from './NotifySettingsCard';
 
 interface SettingsTabProps {
   settings: AppSettings;
@@ -30,6 +31,8 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           Cấu hình thông số múi giờ, tài khoản kết nối và webhook nhận dữ liệu
         </p>
       </div>
+
+      <NotifySettingsCard />
 
       {/* Timezone offset card */}
       <div className="p-5 rounded-xl bg-[#111622] border border-slate-800 space-y-4">

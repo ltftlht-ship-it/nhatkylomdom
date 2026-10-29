@@ -3,6 +3,8 @@ import { buildPositions } from '../reportPositions';
 import { summarize, equityCurve, whatIfRespectSl, whatIfFixedTp, partialStats } from '../reportStats';
 import { computePsychology, DEFAULT_PSY_SETTINGS } from '../psychologyScore';
 import { getPeriodRange } from '../reportPeriods';
+import { buildPeriodReport, buildAlerts } from '../reportMessage';
+import { EMPTY_PROP_RULES } from '../psychologyScore';
 
 let seq = 0;
 function deal(p: Partial<any>): any {
@@ -135,5 +137,44 @@ describe('Kỳ báo cáo', () => {
     const r = getPeriodRange('WEEK', 0, new Date(2026, 9, 29)); // thứ 5, 29/10/2026
     expect(r.start!.getDay()).toBe(1);
     expect(r.start!.getDate()).toBe(26);
+  });
+});
+
+describe('Thông báo', () => {
+  it('Báo cáo tuần trước: đúng kỳ, đúng PnL, có Điểm Tâm Lý', () => {
+    const pos = buildPositions([
+      deal({ pnl: 300, close_price: 2003, open_time: '2026.10.20 10:00:00', close_time: '2026.10.20 11:00:00' }),
+      deal({ pnl: -100, close_price: 1999, open_time: '2026.10.21 10:00:00', close_time: '2026.10.21 11:00:00' }),
+      deal({ pnl: 999, close_price: 2010, open_time: '2026.10.27 10:00:00', close_time: '2026.10.27 11:00:00' }), // tuần này, không tính
+    ], 0, false);
+    const msg = buildPeriodReport({ accountLabel: 'MT5 #1', all: pos, kind: 'WEEK', now: new Date(2026, 9, 29, 9), psy: DEFAULT_PSY_SETTINGS, prop: EMPTY_PROP_RULES, initialBalance: 10000, plansCount: 0 })!;
+    expect(msg).toContain('BÁO CÁO TUẦN');
+    expect(msg).toContain('Tuần 19/10/2026 – 25/10/2026');
+    expect(msg).toContain('+$200.00');
+    expect(msg).toContain('Điểm Tâm Lý');
+  });
+
+  it('Kỳ không có lệnh thì không gửi', () => {
+    expect(buildPeriodReport({ accountLabel: 'x', all: [], kind: 'MONTH', now: new Date(2026, 9, 29), psy: DEFAULT_PSY_SETTINGS, prop: EMPTY_PROP_RULES, initialBalance: 0, plansCount: 0 })).toBeNull();
+  });
+
+  it('Cảnh báo trả thù + tăng lot khi vào lệnh 5 phút sau lệnh thua', () => {
+    const pos = buildPositions([deal({ volume: 1, pnl: -100, close_price: 1999, open_time: '2026.10.29 09:00:00', close_time: '2026.10.29 10:00:00' })], 0, false);
+    const a = buildAlerts({ accountLabel: 'MT5 #1', all: pos, event: 'OPEN', offsetHours: 0, psy: DEFAULT_PSY_SETTINGS, prop: EMPTY_PROP_RULES, initialBalance: 10000,
+      trade: { ticket: '9', symbol: 'XAUUSD', type: 'BUY', volume: 2, open_time: '2026.10.29 10:05:00' } });
+    expect(a.join(' ')).toContain('trả thù');
+    expect(a.join(' ')).toContain('Tăng lot');
+  });
+
+  it('Cảnh báo thua 2 lệnh liền và gần chạm lỗ ngày khi lệnh đóng', () => {
+    const pos = buildPositions([
+      deal({ position_id: 'A', pnl: -400, close_price: 1996, open_time: '2026.10.29 09:00:00', close_time: '2026.10.29 10:00:00' }),
+      deal({ position_id: 'B', pnl: -350, close_price: 1996.5, open_time: '2026.10.29 10:30:00', close_time: '2026.10.29 11:00:00' }),
+    ], 0, false);
+    const a = buildAlerts({ accountLabel: 'MT5 #1', all: pos, event: 'CLOSED', offsetHours: 0, psy: DEFAULT_PSY_SETTINGS,
+      prop: { ...EMPTY_PROP_RULES, dailyLossPct: 1 }, initialBalance: 100000,
+      trade: { ticket: 'x', position_id: 'B', symbol: 'XAUUSD', type: 'BUY', volume: 1, open_time: '2026.10.29 10:30:00' } });
+    expect(a.join(' ')).toContain('Thua 2 lệnh liền');
+    expect(a.join(' ')).toContain('Gần chạm lỗ tối đa ngày');
   });
 });
