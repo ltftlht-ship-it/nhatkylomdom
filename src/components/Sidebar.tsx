@@ -185,80 +185,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
           }
         ];
       case 'bao-cao':
-        return [
-          {
-            id: 'ALL',
-            label: 'Tất Cả Báo Cáo',
-            desc: 'Tổng hợp toàn bộ chỉ số hiệu suất & tâm lý',
-            action: () => {
-              onTabChange('bao-cao');
-              window.dispatchEvent(new CustomEvent('deal_report_section_changed', { detail: 'ALL' }));
-            }
-          },
-          {
-            id: 'PSYCHOLOGY',
-            label: 'Tâm Lý & Kỷ Luật',
-            desc: 'Kiểm toán FOMO, Greed Trap & tuân thủ kỷ luật',
-            action: () => {
-              onTabChange('bao-cao');
-              window.dispatchEvent(new CustomEvent('deal_report_section_changed', { detail: 'PSYCHOLOGY' }));
-            }
-          },
-          {
-            id: 'MFE_MAE',
-            label: 'Hiệu Suất MFE & MAE',
-            desc: 'Bóc tách điểm chốt lời đỉnh và gồng lỗ',
-            action: () => {
-              onTabChange('bao-cao');
-              window.dispatchEvent(new CustomEvent('deal_report_section_changed', { detail: 'MFE_MAE' }));
-            }
-          },
-          {
-            id: 'WHAT_IF',
-            label: 'Giả Lập What-If',
-            desc: 'Mô phỏng PnL khi kỷ luật cắt lỗ & giữ đúng RR',
-            action: () => {
-              onTabChange('bao-cao');
-              window.dispatchEvent(new CustomEvent('deal_report_section_changed', { detail: 'WHAT_IF' }));
-            }
-          },
-          {
-            id: 'PARTIAL_SCALE',
-            label: 'Cắt Lệnh Từng Phần',
-            desc: 'Hiệu quả chốt lời từng phần so với gồng full',
-            action: () => {
-              onTabChange('bao-cao');
-              window.dispatchEvent(new CustomEvent('deal_report_section_changed', { detail: 'PARTIAL_SCALE' }));
-            }
-          },
-          {
-            id: 'INSTRUMENTS',
-            label: 'Ma Trận Cặp Tiền',
-            desc: 'Hiệu suất giao dịch theo từng cặp tài sản',
-            action: () => {
-              onTabChange('bao-cao');
-              window.dispatchEvent(new CustomEvent('deal_report_section_changed', { detail: 'INSTRUMENTS' }));
-            }
-          },
-          {
-            id: 'DISCIPLINE',
-            label: 'Chi Phí Lỗi Vi Phạm',
-            desc: 'Thống kê tổng số tiền mất vì sai kế hoạch',
-            action: () => {
-              onTabChange('bao-cao');
-              window.dispatchEvent(new CustomEvent('deal_report_section_changed', { detail: 'DISCIPLINE' }));
-            }
-          },
-          {
-            id: 'CAPITAL',
-            label: 'Quản Lý Vốn & Phí',
-            desc: 'Tăng trưởng vốn, drawdown & phí hoa hồng',
-            action: () => {
-              onTabChange('bao-cao');
-              window.dispatchEvent(new CustomEvent('deal_report_section_changed', { detail: 'CAPITAL' }));
-            }
+        // Mục lục Tab Báo Cáo: bấm để nhảy tới đúng mục
+        return ([
+          ['tong-quan', 'Tổng quan kỳ'], ['tam-ly', 'Điểm Tâm Lý'], ['plan', 'Tuân thủ Plan'], ['luat-quy', 'Luật Quỹ'],
+          ['hieu-suat', 'Hiệu suất'], ['mfe-mae', 'MFE & MAE'], ['cat-tung-phan', 'Cắt từng phần'], ['gia-lap', 'Giả lập What-If'],
+        ] as [string, string][]).map(([id, label]) => ({
+          id,
+          label,
+          desc: '',
+          action: () => {
+            onTabChange('bao-cao');
+            setTimeout(() => window.dispatchEvent(new CustomEvent('bd_report_jump', { detail: id })), 80);
           }
-        ];
+        }));
       case 'ke-hoach':
         return [
           {
@@ -439,9 +378,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <span>{sub.label}</span>
                       <span className="text-[10px] text-[#737973] group-hover:translate-x-1 transition-transform">→</span>
                     </div>
-                    <div className="text-[11px] text-[#737973] mt-0.5 leading-snug line-clamp-1">
-                      {sub.desc}
-                    </div>
+                    {sub.desc && (
+                      <div className="text-[11px] text-[#737973] mt-0.5 leading-snug line-clamp-1">
+                        {sub.desc}
+                      </div>
+                    )}
                   </button>
                 );
               })}

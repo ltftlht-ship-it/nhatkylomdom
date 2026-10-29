@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ResponsiveContainer, ComposedChart, Area, Line, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell, ReferenceLine } from 'recharts';
 import { TradeRow, AccountInfo, TradingPlan, PreChecklistItem, PostMistakeItem } from '../../types';
 import { getSavedTimezoneOffset } from '../../utils/tradeCalculations';
@@ -66,10 +66,18 @@ export const ReportsView: React.FC<Props> = ({
     return bal > 0 ? bal - Number(activeAccount?.pnl || 0) : 0;
   }, [activeAccount]);
 
+  // "Vào lệnh ngoài plan" chỉ tính khi trong kỳ Thầy có lập plan
+  const plansIn = (r: PeriodRange | null) => plans.filter(pl => {
+    const d = new Date(pl.created_at);
+    return !isNaN(d.getTime()) && (!r || ((!r.start || d >= r.start) && (!r.end || d < r.end)));
+  }).length;
+  const plansCount = useMemo(() => plansIn(range), [plans, range]);
+  const prevPlansCount = useMemo(() => (prevRange ? plansIn(prevRange) : 0), [plans, prevRange]);
+
   const cur = useMemo(() => summarize(list), [list]);
   const prev = useMemo(() => (prevList ? summarize(prevList) : null), [prevList]);
-  const psy = useMemo(() => computePsychology(list, psySettings, plans.length), [list, psySettings, plans.length]);
-  const psyPrev = useMemo(() => (prevList ? computePsychology(prevList, psySettings, plans.length) : null), [prevList, psySettings, plans.length]);
+  const psy = useMemo(() => computePsychology(list, psySettings, plansCount), [list, psySettings, plansCount]);
+  const psyPrev = useMemo(() => (prevList ? computePsychology(prevList, psySettings, prevPlansCount) : null), [prevList, psySettings, prevPlansCount]);
 
   // Đường vốn của kỳ: bắt đầu từ số dư thật tại đầu kỳ
   const startBalance = useMemo(() => {
@@ -78,6 +86,13 @@ export const ReportsView: React.FC<Props> = ({
   }, [all, range, initialBalance]);
   const eq = useMemo(() => equityCurve(list, startBalance), [list, startBalance]);
   const days = useMemo(() => dailyNet(list).map(d => ({ label: `${String(d.date.getDate()).padStart(2, '0')}/${String(d.date.getMonth() + 1).padStart(2, '0')}`, net: Number(d.net.toFixed(2)), count: d.count })), [list]);
+
+  // Thanh bên trái gửi lệnh nhảy tới mục
+  useEffect(() => {
+    const onJump = (e: any) => document.getElementById(e?.detail)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.addEventListener('bd_report_jump', onJump);
+    return () => window.removeEventListener('bd_report_jump', onJump);
+  }, []);
 
   const select = (p: Position) => onSelectTrade?.(p.raw);
   const accountId = String(activeAccount?.id || '');
@@ -189,7 +204,7 @@ export const ReportsView: React.FC<Props> = ({
         )}
       </Card>
 
-      <PsychologySection psy={psy} psyPrev={psyPrev} all={all} settings={psySettings} onSettings={updatePsy} plansCount={plans.length} onSelect={select} />
+      <PsychologySection psy={psy} psyPrev={psyPrev} all={all} settings={psySettings} onSettings={updatePsy} plansCount={plansCount} onSelect={select} />
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <PlanSection list={list} checklistSize={preChecklist.length} />
         <PropSection all={all} initialBalance={initialBalance} accountId={accountId} />
@@ -197,7 +212,7 @@ export const ReportsView: React.FC<Props> = ({
       <PerformanceSection list={list} onSelect={select} />
       <MfeMaeSection list={list} />
       <PartialSection list={list} />
-      <WhatIfSection list={list} psy={psy} plansCount={plans.length} />
+      <WhatIfSection list={list} psy={psy} plansCount={plansCount} />
     </div>
   );
 };
