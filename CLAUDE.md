@@ -73,38 +73,40 @@
 - Bảng chấm điểm kỷ luật và lỗi tâm lý (-penalty points).
 - Đính kèm hình ảnh biểu đồ phân tích kỹ thuật.
 
-### 4. Tab Tổng Quan (`src/components/OverviewTab.tsx`) & Báo Cáo (`src/components/ReportsTab.tsx`)
-- Thống kê chỉ số: Balance, Equity, PnL ròng, Win Rate, Profit Factor, Max Drawdown.
-- Đồng bộ 100% Winrate và PnL với Tab Báo Cáo thông qua `groupTradesByPosition`.
-- Báo cáo Tâm lý & Kỷ luật (FOMO, Greed Trap, vi phạm checklist).
-- Hiệu suất MFE & MAE (đỉnh chốt lời và đáy gồng lỗ).
-- Giả lập What-If (mô phỏng PnL khi kỷ luật SL/TP).
+### 4. Tab Báo Cáo — TRỌNG TÂM CỦA APP (`src/components/reports/`)
+- Đây là **nhật ký báo cáo**, không phải nhật ký vào lệnh. Mục tiêu: biến dữ liệu thật thành con số để Thầy biết tâm lý đang ở mức nào.
+- Mọi công thức nằm ở **một chỗ duy nhất** (có bài kiểm tra `npm test`):
+  - `src/utils/reportPositions.ts`: gom lệnh thành vị thế (cắt từng phần 1.1/1.2 = 1 vị thế), **1R tính từ lãi/lỗ thật của lệnh** (đúng mọi mã: vàng, forex, US30, crypto); lệnh không SL = không có R (không giả định 100$).
+  - `src/utils/reportStats.ts`: tổng quan, đường vốn & sụt giảm, theo nhóm, heatmap giờ×thứ, MFE/MAE, cắt từng phần, giả lập What-If.
+  - `src/utils/psychologyScore.ts`: Điểm Tâm Lý 0–100 (10 chỉ số tự động từ MT5: trả thù, tăng lot sau thua, đánh quá tay, thua 2 lệnh liền vẫn đánh, không SL, lỗ vượt 1R, gồng lỗ, hụt ăn, cắt non, ngoài plan). Mẫu < 5 không tính điểm tổng. Ngưỡng Thầy chỉnh được. Luật quỹ (prop firm).
+  - `src/utils/reportPeriods.ts`: kỳ Tuần/Tháng/Quý/Tùy chọn, so kỳ trước. `src/utils/reportMessage.ts`: nội dung báo cáo/cảnh báo gửi Telegram.
+- Giao diện: `ReportsView.tsx` (trang chính) + `sections.tsx` + `ui.tsx` (màu: lãi `#2e6b4a`, lỗ `#a3402f`, chữ phụ `#5a605a`, số dùng font chính tabular-nums).
+- Bản cũ `src/components/ReportsTab.tsx` (7.500 dòng) còn giữ tạm qua nút "Bản cũ" để so sánh — xóa khi Thầy duyệt xong.
+- Tab Tổng Quan (`OverviewTab.tsx`) chưa viết lại, nên chuyển sang dùng chung `reportStats`.
 
 ---
 
 ## 5. THIẾT LẬP MÔI TRƯỜNG & HƯỚNG DẪN LỆNH CHO CLAUDE
-- **Hệ điều hành**: Windows 11.
-- **Thư mục dự án**: `C:\Users\IVL\Desktop\Claude\big-deal` (bản cũ bên Antigravity: `c:\Users\IVL\Documents\antigravity\calm-borg\BIG-deal`).
-- **Git Repository**: `https://github.com/ltftlht-ship-it/nhatkylomdom.git` (nhánh `main`).
-- **Lưu ý thực thi lệnh trên Windows**:
-  - Do chính sách Execution Policy của PowerShell, khi chạy lệnh npm cần dùng tiền tố `cmd /c`:
-    - Chạy build kiểm tra: `cmd /c npm run build`
-    - Khởi động dev server: `cmd /c npm run dev`
-- **Môi trường Database**:
-  - Supabase kết nối qua biến môi trường trong file `.env` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`).
-  - Các bảng chính: `trades`, `plans`, `licenses`, `ea_keys` (bảng `accounts`, `settings` không tồn tại).
-  - Bảo mật Supabase nằm trong thư mục `supabase/`, chạy theo thứ tự: `security.sql` → `ea_gateway.sql` → `ea_keys.local.sql` (mật mã EA, chỉ có trên máy, không lên GitHub) → `lock_tables.sql` (chỉ chạy khi EA V4 đã đồng bộ được).
-  - Admin duy nhất: `ADMIN_EMAILS` trong `src/lib/supabase.ts`, phải khớp hàm `is_admin()` trong `supabase/security.sql`.
-- **EA MT5**: mã nguồn `mt5/FlatFintech_V4.mq5` (để trống `InpEaSecret`). EA ghi lệnh qua hàm `rpc/ea_upsert_trade` và `rpc/ea_update_status` có kiểm tra mật mã, không ghi thẳng vào bảng. Bản đã điền mật mã được cài trong thư mục `MQL5\Experts` của 2 terminal (Five Percent Online, Tk100k).
+- **Hệ điều hành**: Windows, PowerShell 5.1. Lệnh npm chạy qua `cmd /c` (build: `cmd /c npm run build`, test: `cmd /c npx vitest run`).
+- **Sửa file**: dùng Edit/Write. Nếu buộc phải sửa bằng PowerShell thì luôn `[IO.File]::ReadAllText(path, [Text.Encoding]::UTF8)` — đọc thiếu UTF-8 sẽ làm hỏng chữ tiếng Việt.
+- **Thư mục dự án**: `C:\Users\IVL\Desktop\Claude\big-deal`. Git: `https://github.com/ltftlht-ship-it/nhatkylomdom.git` (nhánh `main`, Vercel tự triển khai `nhatkylomdom.vercel.app`). Kho GitHub đang CÔNG KHAI — nên đổi Private.
+- **Supabase** (project `fvwcanltqxeorfgemxel`, gói Free, Egress 5GB/tháng — tháng 10/2026 đã vượt, app đã giảm ~99% lượng tải):
+  - Bảng: `trades`, `plans`, `licenses` (thành viên), `ea_keys`, `user_settings` (cấu hình đồng bộ), `notify_settings`, `notify_log`, `app_secrets`. Kho ảnh riêng tư `journal` (ảnh lưu tham chiếu `sb://journal/...`).
+  - Đã bật RLS: người lạ không đọc được gì; Admin duy nhất `ltf.tlht@gmail.com` (`ADMIN_EMAILS` trong `src/lib/supabase.ts` khớp `is_admin()` trong SQL); thành viên chỉ thấy số tài khoản MT5 trong bảng `licenses`.
+  - SQL đã chạy (thư mục `supabase/`): `security.sql`, `ea_gateway.sql`, `lock_tables.sql`, `user_settings.sql`, `journal_storage.sql`, `notify.sql`.
+  - App tải nhẹ: danh sách lệnh không kèm ảnh/nến; ảnh tải khi chọn lệnh; kiểm tra thay đổi mỗi 60 giây bằng "dấu vân tay".
+- **EA MT5**: `mt5/FlatFintech_V4.mq5` (để trống `InpEaSecret`). Ghi lệnh qua `rpc/ea_upsert_trade` / `rpc/ea_update_status` có mật mã. Mật mã Admin (`account_id='*'`, dùng cho mọi tài khoản) chỉ nằm trong `supabase/ea_keys.local.sql` (không lên git) và đã gắn sẵn vào EA trong các terminal (Five Percent Online, Tk100k, Exness). Sao lưu EA V3: `mt5/backup_*`.
+- **Thông báo**: Edge Function `notify` (nguồn `supabase/functions/notify/index.ts`, đóng gói 1 file bằng `node scripts/build-notify.mjs` → `supabase/functions/notify-bundle/index.ts`, dán vào trình soạn của Supabase để triển khai). Verify JWT đã TẮT (hàm tự kiểm tra mã `app_secrets` + đăng nhập). Bot Telegram `@bigdeal_nhatky_baocao_bot`, token ở Secrets `TELEGRAM_BOT_TOKEN` (Claude không được tự nhập token). Lịch pg_cron: tuần (T2), tháng (ngày 1), quý — 08:00 giờ VN. Cảnh báo tức thì qua trigger `trades_notify`. Email: chưa bật (cần `RESEND_API_KEY`).
 
 ---
 
-## 6. NHẬT KÝ BÀN GIAO TIẾP QUẢN (HANDOVER NOTE)
-- **Tình trạng hiện tại**:
-  - Biểu đồ nến thị trường liên tục đầy đủ (500 nến) đã được khôi phục chuẩn xác.
-  - Cắm cờ mũi tên nến thật hoạt động mượt mà cho tất cả các lệnh khi Thầy click chọn.
-  - Lỗi co rúm nến và lỗi tự động nhảy lại zoom khi xem biểu đồ đã được xử lý triệt để.
-  - Dự án đã vượt qua kiểm tra build production (`cmd /c npm run build`) với 0 lỗi, mã nguồn sẵn sàng 100%.
-- **Nhiệm vụ tiếp theo khi Thầy yêu cầu**:
-  - Đọc kỹ yêu cầu mới của Thầy, tuân thủ nguyên tắc xưng hô "Thầy - em" và các lằn ranh đỏ ở Mục 1 & 2.
-  - Thực hiện thay đổi chính xác, test lại bằng `cmd /c npm run build` trước khi báo cáo kết quả cho Thầy.
+## 6. NHẬT KÝ BÀN GIAO (cập nhật 30/10/2026)
+- **Đã xong**: bảo mật (bỏ cửa hậu PIN/phiên giả, RLS, cổng EA có mật mã), bỏ số liệu bịa, Winrate đồng nhất, nến biểu đồ đúng mã, Tab Báo Cáo mới, đồng bộ cấu hình lên Supabase, ảnh nhật ký vào kho riêng tư, plan lưu được lên Supabase, thông báo Telegram (đã gửi thật báo cáo tuần 19–25/10).
+- **Còn lại / nên làm tiếp**:
+  1. Thầy duyệt Tab Báo Cáo mới → xóa `ReportsTab.tsx` cũ và nút "Bản cũ"; viết lại Tab Tổng Quan dùng chung `reportStats`.
+  2. Bật email (Resend) nếu Thầy cần.
+  3. Giảm số lần tải lặp danh sách lệnh khi mở app (~6 lần, do code cũ gọi lại).
+  4. Chia nhỏ bundle (1,7MB) để mở nhanh trên điện thoại; bỏ song ngữ.
+  5. EA: phần quét lệnh Limit đang chờ chỉ in log, chưa gửi; đếm số lần dời SL luôn ra 0.
+  6. Rà luồng Plan → Lịch Sử khi Thầy bắt đầu dùng thật (gắn plan, checklist, lỗi tâm lý).
+- **Quy tắc**: test bằng `cmd /c npx vitest run` + `cmd /c npm run build` trước khi báo cáo; làm trên localhost, gom xong mới đẩy GitHub một lần.

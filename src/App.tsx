@@ -12,7 +12,6 @@ import {
   SetupTagItem
 } from './types';
 import { 
-  DEFAULT_PLANS, 
   DEFAULT_PRE_CHECKLIST, 
   DEFAULT_POST_MISTAKES, 
   DEFAULT_SETUP_TAGS 
