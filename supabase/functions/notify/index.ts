@@ -92,7 +92,9 @@ async function positionsOf(acc: string, ctx: Awaited<ReturnType<typeof userConte
   const init = Number(rows.find(r => Number(r.initial_balance) > 0)?.initial_balance) || Number(listed?.initial_balance) || 0;
   const mapped = rows.map(r => ({ ...r, pre_checklist_ids: r.checklist, post_checklist_ids: r.mistake_tags }));
   const trades = processSupabaseTrades(mapped, init, 100, undefined as any, ctx.offset);
-  return { positions: buildPositions(trades, ctx.offset, false), init, label: listed?.name ? `${listed.name} (#${acc})` : `MT5 #${acc}` };
+  const name = String(listed?.name || '');
+  const label = name && !name.includes(acc) ? `${name} (#${acc})` : (name || `MT5 #${acc}`);
+  return { positions: buildPositions(trades, ctx.offset, false), init, label };
 }
 
 /** "Bây giờ" theo giờ hiển thị của app (giờ sàn + bù giờ = giờ Việt Nam GMT+7) */

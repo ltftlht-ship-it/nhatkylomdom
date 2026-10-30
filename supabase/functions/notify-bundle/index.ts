@@ -1061,7 +1061,9 @@ async function positionsOf(acc, ctx) {
   const init = Number(rows.find((r) => Number(r.initial_balance) > 0)?.initial_balance) || Number(listed?.initial_balance) || 0;
   const mapped = rows.map((r) => ({ ...r, pre_checklist_ids: r.checklist, post_checklist_ids: r.mistake_tags }));
   const trades = processSupabaseTrades(mapped, init, 100, void 0, ctx.offset);
-  return { positions: buildPositions(trades, ctx.offset, false), init, label: listed?.name ? `${listed.name} (#${acc})` : `MT5 #${acc}` };
+  const name = String(listed?.name || "");
+  const label = name && !name.includes(acc) ? `${name} (#${acc})` : name || `MT5 #${acc}`;
+  return { positions: buildPositions(trades, ctx.offset, false), init, label };
 }
 var nowDisplay = () => new Date(Date.now() + 7 * 3600 * 1e3 + (/* @__PURE__ */ new Date()).getTimezoneOffset() * 6e4);
 async function runPeriodReports(kind) {
